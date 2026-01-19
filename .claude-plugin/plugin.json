@@ -1,0 +1,8 @@
+{
+  "name": "prev-cli-local",
+  "version": "1.0.0",
+  "description": "Local development utilities for prev-cli project",
+  "commands": "../.claude/commands",
+  "skills": "../.claude/skills",
+  "hooks": "../.claude/hooks/hooks.json"
+}

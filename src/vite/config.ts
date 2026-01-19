@@ -165,6 +165,8 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
         remarkPlugins: [remarkGfm],
         rehypePlugins: [rehypeHighlight],
         providerImportSource: '@mdx-js/react',
+        // Only process MDX files in user's project, not node_modules
+        exclude: /node_modules/,
       }),
       react(),
       createConfigPlugin(config),
