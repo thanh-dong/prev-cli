@@ -214,6 +214,27 @@ body {
   padding-bottom: 3rem !important;
 }
 
+/* Mobile: reduce content padding for better use of screen space */
+@media (max-width: 640px) {
+  .prev-content {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    font-size: 0.9375rem;
+  }
+
+  .prev-content h1 {
+    font-size: 1.75rem;
+  }
+
+  .prev-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .prev-content h3 {
+    font-size: 1.125rem;
+  }
+}
+
 /* Heading styles with better spacing */
 .prev-content h1 {
   font-size: 2.25rem;
@@ -340,12 +361,55 @@ body {
   color: var(--fd-foreground);
 }
 
-/* Table styling */
-.prev-content table {
+/* Table styling - responsive with horizontal scroll on mobile */
+.prev-content .table-wrapper {
   width: 100%;
   margin: 1.75rem 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scroll indicator gradient for tables on mobile */
+@media (max-width: 640px) {
+  .prev-content .table-wrapper {
+    position: relative;
+  }
+
+  .prev-content .table-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, var(--fd-background));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .prev-content .table-wrapper.has-scroll::after {
+    opacity: 1;
+  }
+}
+
+.prev-content table {
+  width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
   font-size: 0.925rem;
+}
+
+/* Mobile: smaller table font and padding */
+@media (max-width: 640px) {
+  .prev-content table {
+    font-size: 0.85rem;
+  }
+
+  .prev-content th,
+  .prev-content td {
+    padding: 0.625rem 0.75rem;
+  }
 }
 
 .prev-content thead {
@@ -357,6 +421,7 @@ body {
   text-align: left;
   font-weight: 600;
   background: var(--fd-muted);
+  white-space: nowrap;
 }
 
 .prev-content th:first-child {

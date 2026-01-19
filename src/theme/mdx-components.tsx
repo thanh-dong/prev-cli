@@ -73,7 +73,39 @@ function MdxLink({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAn
   )
 }
 
+// Responsive table wrapper for horizontal scrolling on mobile
+function MdxTable({ children, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
+  const wrapperRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return
+
+    // Check if table overflows and add class for scroll indicator
+    const checkOverflow = () => {
+      const hasOverflow = wrapper.scrollWidth > wrapper.clientWidth
+      wrapper.classList.toggle('has-scroll', hasOverflow && wrapper.scrollLeft < wrapper.scrollWidth - wrapper.clientWidth - 1)
+    }
+
+    checkOverflow()
+    wrapper.addEventListener('scroll', checkOverflow)
+    window.addEventListener('resize', checkOverflow)
+
+    return () => {
+      wrapper.removeEventListener('scroll', checkOverflow)
+      window.removeEventListener('resize', checkOverflow)
+    }
+  }, [])
+
+  return (
+    <div ref={wrapperRef} className="table-wrapper">
+      <table {...props}>{children}</table>
+    </div>
+  )
+}
+
 export const mdxComponents = {
   Preview,
   a: MdxLink,
+  table: MdxTable,
 }

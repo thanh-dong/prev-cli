@@ -22,7 +22,11 @@ const DEVICE_WIDTHS: Record<DeviceMode, number | '100%'> = {
 
 export function Preview({ src, height = 400, title, mode = 'wasm', showHeader = false }: PreviewProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop')
+  // Default to 'mobile' device mode on mobile viewports to match user's actual environment
+  const [deviceMode, setDeviceMode] = useState<DeviceMode>(() => {
+    if (typeof window === 'undefined') return 'desktop'
+    return window.innerWidth < 768 ? 'mobile' : 'desktop'
+  })
   const [customWidth, setCustomWidth] = useState<number | null>(null)
   const [showSlider, setShowSlider] = useState(false)
 
@@ -197,95 +201,124 @@ export function Preview({ src, height = 400, title, mode = 'wasm', showHeader = 
     </button>
   )
 
+  // Track viewport size for responsive layout
+  const [isMobileViewport, setIsMobileViewport] = useState(typeof window !== 'undefined' ? window.innerWidth < 480 : false)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobileViewport(window.innerWidth < 480)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // DevTools in header - device modes, width slider, fullscreen
-  const DevTools = () => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-      <IconButton
-        onClick={() => handleDeviceChange('mobile')}
-        active={deviceMode === 'mobile' && customWidth === null}
-        title="Mobile (375px)"
-      >
-        <Icon name="mobile" size={16} />
-      </IconButton>
+  // On mobile: simplified controls with just fullscreen
+  // On larger screens: full device controls
+  const DevTools = ({ compact = false }: { compact?: boolean }) => {
+    // Mobile viewport or compact mode: show minimal controls
+    if (isMobileViewport || compact) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+          <IconButton
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            active={isFullscreen}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            <Icon name={isFullscreen ? 'minimize' : 'maximize'} size={16} />
+          </IconButton>
+        </div>
+      )
+    }
 
-      <IconButton
-        onClick={() => handleDeviceChange('tablet')}
-        active={deviceMode === 'tablet' && customWidth === null}
-        title="Tablet (768px)"
-      >
-        <Icon name="tablet" size={16} />
-      </IconButton>
-
-      <IconButton
-        onClick={() => handleDeviceChange('desktop')}
-        active={deviceMode === 'desktop' && customWidth === null}
-        title="Desktop (100%)"
-      >
-        <Icon name="desktop" size={16} />
-      </IconButton>
-
-      <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--fd-border, #e4e4e7)', margin: '0 4px' }} />
-
-      {/* Width slider toggle */}
-      <div style={{ position: 'relative' }}>
+    // Full controls for larger screens
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
         <IconButton
-          onClick={() => setShowSlider(!showSlider)}
-          active={showSlider || customWidth !== null}
-          title="Custom width"
+          onClick={() => handleDeviceChange('mobile')}
+          active={deviceMode === 'mobile' && customWidth === null}
+          title="Mobile (375px)"
         >
-          <Icon name="sliders" size={16} />
+          <Icon name="mobile" size={16} />
         </IconButton>
 
-        {showSlider && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            marginTop: '8px',
-            padding: '12px',
-            backgroundColor: 'var(--fd-background, #fff)',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            border: '1px solid var(--fd-border, #e4e4e7)',
-            minWidth: '192px',
-            zIndex: 100,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--fd-muted-foreground, #71717a)' }}>
-                Width: {customWidth ?? currentWidth ?? '100%'}px
-              </span>
-              <button
-                onClick={() => setShowSlider(false)}
-                style={{ padding: '2px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fd-muted-foreground, #a1a1aa)' }}
-              >
-                <Icon name="x" size={12} />
-              </button>
-            </div>
-            <input
-              type="range"
-              min={320}
-              max={1920}
-              value={customWidth ?? (typeof currentWidth === 'number' ? currentWidth : 1920)}
-              onChange={(e) => handleSliderChange(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--fd-primary, #3b82f6)' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--fd-muted-foreground, #a1a1aa)', marginTop: '4px' }}>
-              <span>320px</span>
-              <span>1920px</span>
-            </div>
-          </div>
-        )}
-      </div>
+        <IconButton
+          onClick={() => handleDeviceChange('tablet')}
+          active={deviceMode === 'tablet' && customWidth === null}
+          title="Tablet (768px)"
+        >
+          <Icon name="tablet" size={16} />
+        </IconButton>
 
-      <IconButton
-        onClick={() => setIsFullscreen(!isFullscreen)}
-        active={isFullscreen}
-        title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-      >
-        <Icon name={isFullscreen ? 'minimize' : 'maximize'} size={16} />
-      </IconButton>
-    </div>
-  )
+        <IconButton
+          onClick={() => handleDeviceChange('desktop')}
+          active={deviceMode === 'desktop' && customWidth === null}
+          title="Desktop (100%)"
+        >
+          <Icon name="desktop" size={16} />
+        </IconButton>
+
+        <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--fd-border, #e4e4e7)', margin: '0 4px' }} />
+
+        {/* Width slider toggle */}
+        <div style={{ position: 'relative' }}>
+          <IconButton
+            onClick={() => setShowSlider(!showSlider)}
+            active={showSlider || customWidth !== null}
+            title="Custom width"
+          >
+            <Icon name="sliders" size={16} />
+          </IconButton>
+
+          {showSlider && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: '8px',
+              padding: '12px',
+              backgroundColor: 'var(--fd-background, #fff)',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              border: '1px solid var(--fd-border, #e4e4e7)',
+              minWidth: '192px',
+              zIndex: 100,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--fd-muted-foreground, #71717a)' }}>
+                  Width: {customWidth ?? currentWidth ?? '100%'}px
+                </span>
+                <button
+                  onClick={() => setShowSlider(false)}
+                  style={{ padding: '2px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fd-muted-foreground, #a1a1aa)' }}
+                >
+                  <Icon name="x" size={12} />
+                </button>
+              </div>
+              <input
+                type="range"
+                min={320}
+                max={1920}
+                value={customWidth ?? (typeof currentWidth === 'number' ? currentWidth : 1920)}
+                onChange={(e) => handleSliderChange(parseInt(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--fd-primary, #3b82f6)' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--fd-muted-foreground, #a1a1aa)', marginTop: '4px' }}>
+                <span>320px</span>
+                <span>1920px</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <IconButton
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          active={isFullscreen}
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        >
+          <Icon name={isFullscreen ? 'minimize' : 'maximize'} size={16} />
+        </IconButton>
+      </div>
+    )
+  }
 
   // Register DevTools in toolbar when on detail page (showHeader mode)
   useEffect(() => {
@@ -469,34 +502,45 @@ export function Preview({ src, height = 400, title, mode = 'wasm', showHeader = 
       overflow: 'hidden',
       position: 'relative',
     }}>
-      {/* Compact header */}
+      {/* Compact header - responsive for mobile */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '8px 12px',
+        padding: isMobileViewport ? '6px 10px' : '8px 12px',
         backgroundColor: 'var(--fd-card, #fafafa)',
         borderBottom: '1px solid var(--fd-border, #e4e4e7)',
+        gap: '8px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--fd-foreground, #52525b)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+          <span style={{
+            fontSize: isMobileViewport ? '13px' : '14px',
+            fontWeight: 500,
+            color: 'var(--fd-foreground, #52525b)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
             {displayTitle}
           </span>
           {mode === 'wasm' && buildStatus === 'building' && (
-            <Icon name="loader" size={14} style={{ color: 'var(--fd-primary, #3b82f6)', animation: 'spin 1s linear infinite' }} />
+            <Icon name="loader" size={14} style={{ color: 'var(--fd-primary, #3b82f6)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
           )}
           {mode === 'wasm' && buildStatus === 'error' && (
-            <span style={{ fontSize: '12px', color: '#ef4444' }}>Error</span>
+            <span style={{ fontSize: '12px', color: '#ef4444', flexShrink: 0 }}>Error</span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {mode === 'wasm' && buildTime && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {/* Hide build time and width on mobile to save space */}
+          {!isMobileViewport && mode === 'wasm' && buildTime && (
             <span style={{ fontSize: '12px', color: 'var(--fd-muted-foreground, #a1a1aa)' }}>{buildTime}ms</span>
           )}
-          <span style={{ fontSize: '12px', color: 'var(--fd-muted-foreground, #a1a1aa)' }}>
-            {currentWidth ? `${currentWidth}px` : '100%'}
-          </span>
-          <DevTools />
+          {!isMobileViewport && (
+            <span style={{ fontSize: '12px', color: 'var(--fd-muted-foreground, #a1a1aa)' }}>
+              {currentWidth ? `${currentWidth}px` : '100%'}
+            </span>
+          )}
+          <DevTools compact={isMobileViewport} />
         </div>
       </div>
 
