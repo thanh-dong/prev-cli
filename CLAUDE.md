@@ -112,23 +112,12 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 ## Releasing
 
-Releases are automated via GitHub Actions. To release a new version:
+Releases are fully automated via CI. Just push a version tag:
 
 ```bash
-# 1. Commit your changes
-git add . && git commit -m "feat: your feature"
-
-# 2. Bump version (patch/minor/major)
-npm version patch  # or minor/major
-
-# 3. Push with tags
-git push origin main --tags
+git tag v0.x.x && git push origin v0.x.x
 ```
 
-The CI workflow (`.github/workflows/release.yml`) will:
-1. Run tests
-2. Build the project
-3. Publish to npm with provenance
-4. Create a GitHub Release with auto-generated notes
+The workflow automatically runs tests, builds, publishes to npm, and creates a GitHub Release.
 
-**Required secret:** `NPM_TOKEN` - npm access token with publish permissions.
+**Required secret:** `NPM_TOKEN` in GitHub repo settings.
