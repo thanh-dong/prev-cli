@@ -149,9 +149,31 @@ export async function scanPages(rootDir: string, options: ScanOptions = {}): Pro
 
   // Build ignore patterns - always ignore these, plus dot dirs not in include list
   const ignore = [
-    'node_modules/**',
-    'dist/**',
-    '.cache/**',
+    '**/node_modules/**',  // Catch node_modules at any depth
+    '**/.worktrees/**',    // Git worktrees contain their own node_modules
+    '**/.claude/**',       // Claude Code config files
+    '**/dist/**',
+    '**/.cache/**',
+    '**/.git/**',
+    '**/coverage/**',
+    '**/build/**',
+    '**/.next/**',
+    '**/.nuxt/**',
+    '**/.turbo/**',
+    '**/.vercel/**',
+    '**/.svelte-kit/**',
+    '**/vendor/**',        // Common in PHP/Go projects
+    '**/target/**',        // Rust build output
+    // Monorepo app directories (contain code, not docs)
+    'apps/**',
+    'packages/**',
+    'services/**',
+    'libs/**',
+    'src/**',              // Source code directory
+    'test/**',
+    'tests/**',
+    '__tests__/**',
+    'e2e/**',
     // Common non-documentation files at root
     'CLAUDE.md',
     'CHANGELOG.md',
@@ -195,35 +217,37 @@ export async function scanPages(rootDir: string, options: ScanOptions = {}): Pro
     }
   }
 
-  const pages: Page[] = []
+  // Read all files in parallel for faster scanning
+  const fileEntries = Array.from(routeMap.values())
+  const pages = await Promise.all(
+    fileEntries.map(async ({ file }) => {
+      const fullPath = path.join(rootDir, file)
+      const rawContent = await readFile(fullPath, 'utf-8')
+      const { frontmatter, content } = parseFrontmatter(rawContent)
+      const title = extractTitle(content, file, frontmatter)
 
-  for (const { file } of routeMap.values()) {
-    const fullPath = path.join(rootDir, file)
-    const rawContent = await readFile(fullPath, 'utf-8')
-    const { frontmatter, content } = parseFrontmatter(rawContent)
-    const title = extractTitle(content, file, frontmatter)
+      const page: Page = {
+        route: fileToRoute(file),
+        title,
+        file
+      }
 
-    const page: Page = {
-      route: fileToRoute(file),
-      title,
-      file
-    }
+      if (frontmatter.description) {
+        page.description = frontmatter.description as string
+      }
 
-    if (frontmatter.description) {
-      page.description = frontmatter.description as string
-    }
+      if (Object.keys(frontmatter).length > 0) {
+        page.frontmatter = frontmatter
+      }
 
-    if (Object.keys(frontmatter).length > 0) {
-      page.frontmatter = frontmatter
-    }
+      // Check if page is hidden via frontmatter
+      if (frontmatter.hidden === true) {
+        page.hidden = true
+      }
 
-    // Check if page is hidden via frontmatter
-    if (frontmatter.hidden === true) {
-      page.hidden = true
-    }
-
-    pages.push(page)
-  }
+      return page
+    })
+  )
 
   return pages.sort((a, b) => a.route.localeCompare(b.route))
 }
