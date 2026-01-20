@@ -128,6 +128,11 @@ export async function startDev(rootDir: string, options: DevOptions = {}) {
   const server = await createServer(config)
   await server.listen()
 
+  // Pre-warm deps immediately after server starts
+  // This triggers optimizeDeps bundling before user's first page load
+  const warmupPort = server.config.server.port
+  fetch(`http://localhost:${warmupPort}/`).catch(() => {})
+
   // Write debug report if enabled
   const debugCollector = getDebugCollector()
   if (debugCollector) {

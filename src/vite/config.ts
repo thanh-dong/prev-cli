@@ -6,9 +6,10 @@ import mdx from '@mdx-js/rollup'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import path from 'path'
+import os from 'os'
 import { fileURLToPath } from 'url'
 import { existsSync, readFileSync } from 'fs'
-import { ensureCacheDir } from '../utils/cache'
+// ensureCacheDir no longer needed - using global cache
 import { pagesPlugin } from './plugins/pages-plugin'
 import { entryPlugin } from './plugins/entry-plugin'
 import { previewsPlugin } from './plugins/previews-plugin'
@@ -150,7 +151,6 @@ export interface ConfigOptions {
 
 export async function createViteConfig(options: ConfigOptions): Promise<InlineConfig> {
   const { rootDir, mode, port, include, base, debug } = options
-  const cacheDir = await ensureCacheDir(rootDir)
   const config = loadConfig(rootDir)
 
   // Create debug collector if debug mode is enabled
@@ -162,10 +162,13 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
   // Note: Previews are now built separately by the previews plugin
   // using esbuild for standalone HTML output
 
+  // Use global cache for optimized deps - shared across all projects
+  const globalCacheDir = path.join(os.homedir(), '.cache/prev/deps')
+
   return {
     root: rootDir,
     mode,
-    cacheDir,
+    cacheDir: globalCacheDir,  // Global cache for faster subsequent starts
     base: base || '/',  // Support subpath deployment (e.g., GitHub Pages)
     customLogger: createFriendlyLogger(),
     // Use 'silent' for production builds to hide file listing
@@ -372,7 +375,6 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
         'mermaid': path.join(cliNodeModules, 'mermaid'),
         'dayjs': path.join(cliNodeModules, 'dayjs'),
         '@terrastruct/d2': path.join(cliNodeModules, '@terrastruct/d2'),
-        // NOTE: Fumadocs packages handled entirely by fumadocsPlugin
       },
       // Dedupe to prevent multiple module instances (critical for React contexts)
       dedupe: [
@@ -383,23 +385,13 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
     },
 
     optimizeDeps: {
-      // Disable auto-discovery but pre-bundle packages that have CJS/ESM issues
-      // These packages don't work correctly when served unbundled to browsers
+      // Minimum pre-bundling for CJS compatibility
       noDiscovery: true,
+      holdUntilCrawlEnd: false,
       include: [
-        // React core - has CJS exports that need conversion
-        'react',
-        'react-dom',
         'react-dom/client',
-        'react/jsx-runtime',
-        'react/jsx-dev-runtime',
-        // TanStack Router and its dependencies
-        '@tanstack/react-router',
-        // CJS-only: used by @tanstack/react-store, has no ESM exports
         'use-sync-external-store',
         'use-sync-external-store/shim/with-selector.js',
-        // MDX provider
-        '@mdx-js/react',
       ],
       exclude: [
         // Virtual modules provided by our plugins - not real packages
