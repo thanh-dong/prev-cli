@@ -375,6 +375,8 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
         'mermaid': path.join(cliNodeModules, 'mermaid'),
         'dayjs': path.join(cliNodeModules, 'dayjs'),
         '@terrastruct/d2': path.join(cliNodeModules, '@terrastruct/d2'),
+        // CJS compatibility (used by @tanstack/react-store)
+        'use-sync-external-store': path.join(cliNodeModules, 'use-sync-external-store'),
       },
       // Dedupe to prevent multiple module instances (critical for React contexts)
       dedupe: [
