@@ -392,6 +392,9 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
         'react-dom/client',
         'use-sync-external-store',
         'use-sync-external-store/shim/with-selector.js',
+        // Mermaid and its CJS deps need pre-bundling
+        'mermaid',
+        'dayjs',
       ],
       exclude: [
         // Virtual modules provided by our plugins - not real packages
