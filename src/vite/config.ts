@@ -16,6 +16,15 @@ import { previewsPlugin } from './plugins/previews-plugin'
 import { createConfigPlugin } from './plugins/config-plugin'
 import { debugPlugin } from './plugins/debug-plugin'
 import { buildPreviewConfig } from './previews'
+import { parseFlowDefinition, parseAtlasDefinition } from './config-parser'
+
+// Type mapping for plural to singular (handles 'atlas' correctly)
+const TYPE_SINGULAR: Record<string, string> = {
+  components: 'component',
+  screens: 'screen',
+  flows: 'flow',
+  atlas: 'atlas',  // No change needed for atlas
+}
 import { loadConfig, updateOrder } from '../config'
 import { createDebugCollector, getDebugCollector } from '../utils/debug'
 // fumadocsPlugin removed - using custom lightweight layout
@@ -293,30 +302,121 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
             }
 
             // Serve preview config as JSON for WASM runtime
+            // Supports: /_preview-config/button (legacy) and /_preview-config/flows/checkout
             if (urlPath.startsWith('/_preview-config/')) {
-              const previewName = decodeURIComponent(urlPath.slice('/_preview-config/'.length))
+              const pathAfterConfig = decodeURIComponent(urlPath.slice('/_preview-config/'.length))
               const previewsDir = path.join(rootDir, 'previews')
-              const previewDir = path.resolve(previewsDir, previewName)
 
-              // Security: prevent path traversal
-              if (!previewDir.startsWith(previewsDir)) {
-                res.statusCode = 403
-                res.end('Forbidden')
-                return
-              }
+              // Check if this is a multi-type path: flows/name, atlas/name, etc.
+              const multiTypeMatch = pathAfterConfig.match(/^(components|screens|flows|atlas)\/(.+)$/)
 
-              if (existsSync(previewDir)) {
-                try {
-                  const config = await buildPreviewConfig(previewDir)
-                  res.setHeader('Content-Type', 'application/json')
-                  res.end(JSON.stringify(config))
-                  return
-                } catch (err) {
-                  console.error('Error building preview config:', err)
-                  res.statusCode = 500
-                  res.end(JSON.stringify({ error: String(err) }))
+              if (multiTypeMatch) {
+                const [, type, name] = multiTypeMatch
+                // URL already contains plural form (flows, atlas), use directly
+                const configPathYaml = path.join(previewsDir, type, name, 'index.yaml')
+                const configPathYml = path.join(previewsDir, type, name, 'index.yml')
+                const configPath = existsSync(configPathYaml) ? configPathYaml : configPathYml
+
+                // Security: prevent path traversal
+                if (!configPath.startsWith(previewsDir)) {
+                  res.statusCode = 403
+                  res.end('Forbidden')
                   return
                 }
+
+                if (existsSync(configPath)) {
+                  try {
+                    if (type === 'flows') {
+                      const flow = await parseFlowDefinition(configPath)
+                      if (flow) {
+                        res.setHeader('Content-Type', 'application/json')
+                        res.end(JSON.stringify(flow))
+                        return
+                      }
+                    } else if (type === 'atlas') {
+                      const atlas = await parseAtlasDefinition(configPath)
+                      if (atlas) {
+                        res.setHeader('Content-Type', 'application/json')
+                        res.end(JSON.stringify(atlas))
+                        return
+                      }
+                    } else {
+                      // For components/screens, use legacy buildPreviewConfig
+                      const previewDir = path.join(previewsDir, type, name)
+                      const config = await buildPreviewConfig(previewDir)
+                      res.setHeader('Content-Type', 'application/json')
+                      res.end(JSON.stringify(config))
+                      return
+                    }
+                    res.statusCode = 400
+                    res.end(JSON.stringify({ error: 'Invalid config format' }))
+                    return
+                  } catch (err) {
+                    console.error('Error building preview config:', err)
+                    res.statusCode = 500
+                    res.end(JSON.stringify({ error: String(err) }))
+                    return
+                  }
+                }
+              } else {
+                // Legacy path: /_preview-config/button (assumes components)
+                const previewDir = path.resolve(previewsDir, pathAfterConfig)
+
+                // Security: prevent path traversal
+                if (!previewDir.startsWith(previewsDir)) {
+                  res.statusCode = 403
+                  res.end('Forbidden')
+                  return
+                }
+
+                if (existsSync(previewDir)) {
+                  try {
+                    const config = await buildPreviewConfig(previewDir)
+                    res.setHeader('Content-Type', 'application/json')
+                    res.end(JSON.stringify(config))
+                    return
+                  } catch (err) {
+                    console.error('Error building preview config:', err)
+                    res.statusCode = 500
+                    res.end(JSON.stringify({ error: String(err) }))
+                    return
+                  }
+                }
+              }
+            }
+
+            // Handle multi-type preview routes: /_preview/components/button, /_preview/flows/checkout, etc.
+            if (urlPath.match(/^\/_preview\/(components|screens|flows|atlas)\/[^/]+\/?$/)) {
+              const routeMatch = urlPath.match(/^\/_preview\/(\w+)\/([^/]+)\/?$/)
+              if (routeMatch) {
+                const [, type, name] = routeMatch
+                const singularType = TYPE_SINGULAR[type] || type
+
+                // Serve the preview shell page which will load the right component
+                const shellHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Preview: ${name}</title>
+  <script type="module">
+    import { PreviewRouter } from '@prev/theme/previews'
+    import { createRoot } from 'react-dom/client'
+    import React from 'react'
+
+    createRoot(document.getElementById('root')).render(
+      React.createElement(PreviewRouter, { type: '${singularType}', name: '${name}' })
+    )
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>`
+
+                const transformed = await server.transformIndexHtml(req.url!, shellHtml)
+                res.setHeader('Content-Type', 'text/html')
+                res.end(transformed)
+                return
               }
             }
 
