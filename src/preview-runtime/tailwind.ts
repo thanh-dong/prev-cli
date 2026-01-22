@@ -2,6 +2,11 @@ import { $ } from 'bun'
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs'
 import { join, dirname } from 'path'
 import { tmpdir } from 'os'
+import { fileURLToPath } from 'url'
+
+// Resolve tailwindcss CLI from this package's node_modules
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const tailwindBin = join(__dirname, '../../node_modules/.bin/tailwindcss')
 
 export interface TailwindResult {
   success: boolean
@@ -46,8 +51,8 @@ export async function compileTailwind(files: ContentFile[]): Promise<TailwindRes
 
     const outputPath = join(tempDir, 'output.css')
 
-    // Run Tailwind CLI
-    await $`bunx tailwindcss -c ${configPath} -i ${inputPath} -o ${outputPath} --minify`.quiet()
+    // Run Tailwind CLI from package's node_modules
+    await $`${tailwindBin} -c ${configPath} -i ${inputPath} -o ${outputPath} --minify`.quiet()
 
     const css = readFileSync(outputPath, 'utf-8')
 
