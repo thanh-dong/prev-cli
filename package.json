@@ -65,7 +65,8 @@
     "remark-gfm": "^4.0.0",
     "tailwind-merge": "^2.5.0",
     "tailwindcss": "^4.0.0",
-    "vite": "npm:rolldown-vite@^7.3.1"
+    "vite": "npm:rolldown-vite@^7.3.1",
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
