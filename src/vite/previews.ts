@@ -3,6 +3,17 @@ import fg from 'fast-glob'
 import path from 'path'
 import { existsSync, readFileSync } from 'fs'
 import type { PreviewFile, PreviewConfig } from '../preview-runtime/types'
+import type { PreviewUnit, PreviewType } from './preview-types'
+import { parsePreviewConfig } from './config-parser'
+
+// Type folder names and their corresponding PreviewType
+const PREVIEW_TYPE_FOLDERS = ['components', 'screens', 'flows', 'atlas'] as const
+const TYPE_MAP: Record<string, PreviewType> = {
+  components: 'component',
+  screens: 'screen',
+  flows: 'flow',
+  atlas: 'atlas',
+}
 
 export interface Preview {
   name: string
@@ -98,4 +109,112 @@ export async function buildPreviewConfig(previewDir: string): Promise<PreviewCon
     entry,
     tailwind: true,
   }
+}
+
+/**
+ * Scan previews with multi-type folder structure support
+ * Supports: components/, screens/, flows/, atlas/
+ */
+export async function scanPreviewUnits(rootDir: string): Promise<PreviewUnit[]> {
+  const previewsDir = path.join(rootDir, 'previews')
+
+  if (!existsSync(previewsDir)) {
+    return []
+  }
+
+  const units: PreviewUnit[] = []
+
+  for (const typeFolder of PREVIEW_TYPE_FOLDERS) {
+    const typeDir = path.join(previewsDir, typeFolder)
+    if (!existsSync(typeDir)) continue
+
+    const type = TYPE_MAP[typeFolder]
+
+    // Get immediate subdirectories (each is a preview unit)
+    const entries = await fg.glob('*/', {
+      cwd: typeDir,
+      onlyDirectories: true,
+      deep: 1
+    })
+
+    for (const entry of entries) {
+      const name = entry.replace(/\/$/, '')
+      const unitDir = path.join(typeDir, name)
+
+      // Detect files
+      const files = await detectUnitFiles(unitDir, type)
+      if (!files.index) continue // Skip if no index file
+
+      // Check for config with both extensions
+      const configPath = existsSync(path.join(unitDir, 'config.yaml'))
+        ? path.join(unitDir, 'config.yaml')
+        : path.join(unitDir, 'config.yml')
+      const config = await parsePreviewConfig(configPath)
+
+      units.push({
+        type,
+        name,
+        path: unitDir,
+        route: `/_preview/${typeFolder}/${name}`,
+        config,
+        files,
+      })
+    }
+  }
+
+  return units
+}
+
+/**
+ * Detect files in a preview unit directory
+ */
+async function detectUnitFiles(
+  unitDir: string,
+  type: PreviewType
+): Promise<PreviewUnit['files']> {
+  const allFiles = await fg.glob('*', { cwd: unitDir })
+
+  // Find index file based on type
+  let index: string | undefined
+
+  if (type === 'flow' || type === 'atlas') {
+    // Flow and Atlas use YAML index files
+    index = allFiles.find(f => f === 'index.yaml' || f === 'index.yml')
+  } else {
+    // Component or Screen - look for TSX/JSX/TS/JS or HTML
+    const priorities = [
+      'index.tsx', 'index.jsx', 'index.ts', 'index.js',
+      'App.tsx', 'App.jsx', 'index.html'
+    ]
+    index = priorities.find(p => allFiles.includes(p))
+  }
+
+  const result: PreviewUnit['files'] = {
+    index: index || '',
+  }
+
+  // For screens: find state files (any .tsx/.jsx that isn't the index)
+  if (type === 'screen' && index) {
+    const stateFiles = allFiles.filter(f =>
+      (f.endsWith('.tsx') || f.endsWith('.jsx')) &&
+      f !== index
+    ).sort()
+    if (stateFiles.length > 0) {
+      result.states = stateFiles
+    }
+  }
+
+  // For components: find schema.ts
+  if (type === 'component') {
+    if (allFiles.includes('schema.ts')) {
+      result.schema = 'schema.ts'
+    }
+  }
+
+  // Find docs.mdx if present
+  if (allFiles.includes('docs.mdx') || allFiles.includes('README.mdx')) {
+    result.docs = allFiles.find(f => f.endsWith('.mdx'))
+  }
+
+  return result
 }
