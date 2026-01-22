@@ -1,7 +1,8 @@
 // src/vite/plugins/previews-plugin.ts
 import type { Plugin } from 'vite'
 import { scanPreviews, scanPreviewUnits, buildPreviewConfig } from '../previews'
-import { buildPreviewHtml } from '../../preview-runtime/build'
+import { buildVendorBundle } from '../../preview-runtime/vendors'
+import { buildOptimizedPreview } from '../../preview-runtime/build-optimized'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import path from 'path'
 
@@ -81,37 +82,51 @@ export function getByStatus(status) {
 
       const distDir = path.join(rootDir, 'dist')
       const targetDir = path.join(distDir, '_preview')
+      const vendorsDir = path.join(targetDir, '_vendors')
       const previewsDir = path.join(rootDir, 'previews')
 
-      // Clean up old Vite-generated preview folder if exists
+      // Clean up old directories
       const oldPreviewsDir = path.join(distDir, 'previews')
       if (existsSync(oldPreviewsDir)) {
         rmSync(oldPreviewsDir, { recursive: true })
       }
-
-      // Remove old target if exists
       if (existsSync(targetDir)) {
         rmSync(targetDir, { recursive: true })
       }
 
-      // Scan and build each preview
+      // Scan previews
       const previews = await scanPreviews(rootDir)
-
       if (previews.length === 0) return
 
       console.log(`\n  Building ${previews.length} preview(s)...`)
 
+      // Step 1: Build shared vendor bundle
+      console.log('    Building shared vendor bundle...')
+      mkdirSync(vendorsDir, { recursive: true })
+
+      const vendorResult = await buildVendorBundle()
+      if (!vendorResult.success) {
+        console.error(`    ✗ Vendor bundle: ${vendorResult.error}`)
+        return
+      }
+      writeFileSync(path.join(vendorsDir, 'runtime.js'), vendorResult.code)
+      console.log('    ✓ _vendors/runtime.js')
+
+      // Step 2: Build each preview with optimized builder
       for (const preview of previews) {
         const previewDir = path.join(previewsDir, preview.name)
 
         try {
-          // Build preview config from files
           const config = await buildPreviewConfig(previewDir)
 
-          // Build standalone HTML
-          const result = await buildPreviewHtml(config)
+          // Calculate relative path from preview to vendors
+          // e.g., components/button -> ../../_vendors/runtime.js
+          const depth = preview.name.split('/').length
+          const vendorPath = '../'.repeat(depth) + '_vendors/runtime.js'
 
-          if (result.error) {
+          const result = await buildOptimizedPreview(config, { vendorPath })
+
+          if (!result.success) {
             console.error(`    ✗ ${preview.name}: ${result.error}`)
             continue
           }
