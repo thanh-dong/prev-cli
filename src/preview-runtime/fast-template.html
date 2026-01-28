@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview</title>
+  <!-- Tailwind CSS v4 Play CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- Preload React -->
+  <link rel="modulepreload" href="https://esm.sh/react@18">
+  <link rel="modulepreload" href="https://esm.sh/react-dom@18/client">
+  <link rel="modulepreload" href="https://esm.sh/react@18/jsx-runtime">
+  <style>
+    body { margin: 0; }
+    #root { min-height: 100vh; }
+    .preview-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      color: #666;
+    }
+    .preview-error {
+      padding: 1rem;
+      background: #fef2f2;
+      color: #dc2626;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"><div class="preview-loading">Loading preview...</div></div>
+
+  <!-- Import map must be BEFORE any module scripts -->
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18",
+      "react-dom": "https://esm.sh/react-dom@18",
+      "react-dom/client": "https://esm.sh/react-dom@18/client",
+      "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime"
+    }
+  }
+  </script>
+
+  <script type="module">
+    // Fast preview runtime - uses server-side bundled code
+    const params = new URLSearchParams(window.location.search)
+    const src = params.get('src')
+
+    if (!src) {
+      document.getElementById('root').innerHTML = '<div class="preview-error">No preview source specified</div>'
+    } else {
+      const startTime = performance.now()
+
+      try {
+        // Pre-fetch tokens, JSX, and bundle in parallel
+        const [tokensRes, jsxModule, bundleResponse] = await Promise.all([
+          fetch('/_prev/tokens.json').then(r => r.json()).catch(() => null),
+          import(`${window.location.origin}/_prev/jsx.js`),
+          fetch(`/_preview-bundle/${src}`)
+        ])
+
+        // Set tokens
+        if (tokensRes && jsxModule.setTokensConfig) {
+          jsxModule.setTokensConfig(tokensRes)
+        }
+
+        const bundleTime = bundleResponse.headers.get('X-Bundle-Time') || '?'
+
+        if (!bundleResponse.ok) {
+          throw new Error(`Bundle failed: ${await bundleResponse.text()}`)
+        }
+
+        // Bundle has React imports rewritten, but @prev/jsx needs client rewrite
+        let code = await bundleResponse.text()
+        code = code.replace(/from\s*["']@prev\/jsx["']/g, `from "${window.location.origin}/_prev/jsx.js"`)
+
+        // Create module blob and import it
+        const blob = new Blob([code], { type: 'application/javascript' })
+        const moduleUrl = URL.createObjectURL(blob)
+
+        const module = await import(moduleUrl)
+        URL.revokeObjectURL(moduleUrl)
+
+        // Render
+        const { createRoot } = await import('https://esm.sh/react-dom@18/client')
+        const React = await import('https://esm.sh/react@18')
+
+        const App = module.default
+        if (App) {
+          const root = createRoot(document.getElementById('root'))
+          root.render(React.createElement(App))
+        }
+
+        const totalTime = Math.round(performance.now() - startTime)
+        parent.postMessage({
+          type: 'built',
+          result: { success: true, buildTime: parseInt(bundleTime, 10) || totalTime }
+        }, '*')
+
+      } catch (err) {
+        document.getElementById('root').innerHTML = `<div class="preview-error">${err.message}</div>`
+        parent.postMessage({ type: 'error', error: err.message }, '*')
+      }
+    }
+
+    // Signal ready immediately
+    parent.postMessage({ type: 'ready' }, '*')
+  </script>
+</body>
+</html>

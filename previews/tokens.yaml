@@ -1,0 +1,6 @@
+# User token overrides - partial config works!
+colors:
+  primary: "#ff6600"  # Orange instead of blue
+
+backgrounds:
+  primary: "#ff6600"

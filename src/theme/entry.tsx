@@ -15,8 +15,10 @@ import {
 import { MDXProvider } from '@mdx-js/react'
 import { pages, sidebar } from 'virtual:prev-pages'
 import { pageModules } from 'virtual:prev-page-modules'
-import { previews } from 'virtual:prev-previews'
+import { previews, previewUnits } from 'virtual:prev-previews'
+import type { PreviewUnit, PreviewType } from '../vite/preview-types'
 import { Preview } from './Preview'
+import { TokensPage } from './previews/TokensPage'
 import { useDiagrams } from './diagrams'
 import { Layout } from './Layout'
 import { MetadataBlock } from './MetadataBlock'
@@ -91,9 +93,119 @@ function PageWrapper({ Component, meta }: { Component: React.ComponentType; meta
   )
 }
 
-// Previews catalog - Storybook-like gallery with clickable cards
+// Category metadata for display
+const CATEGORY_META: Record<PreviewType, { label: string; icon: string; description: string }> = {
+  component: {
+    label: 'Components',
+    icon: '⬡',
+    description: 'Reusable UI building blocks',
+  },
+  screen: {
+    label: 'Screens',
+    icon: '▣',
+    description: 'Full page layouts and views',
+  },
+  flow: {
+    label: 'Flows',
+    icon: '⇢',
+    description: 'Multi-step user journeys',
+  },
+  atlas: {
+    label: 'Atlas',
+    icon: '◎',
+    description: 'Information architecture maps',
+  },
+}
+
+// Category display order
+const CATEGORY_ORDER: PreviewType[] = ['component', 'screen', 'flow', 'atlas']
+
+// Group previews by type
+function groupByType(units: PreviewUnit[]): Map<PreviewType, PreviewUnit[]> {
+  const grouped = new Map<PreviewType, PreviewUnit[]>()
+  for (const unit of units) {
+    const existing = grouped.get(unit.type) || []
+    grouped.set(unit.type, [...existing, unit])
+  }
+  return grouped
+}
+
+// Category section component
+function CategorySection({ type, units }: { type: PreviewType; units: PreviewUnit[] }) {
+  const meta = CATEGORY_META[type]
+
+  return (
+    <section style={{ marginBottom: '32px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '16px',
+        paddingBottom: '12px',
+        borderBottom: '1px solid var(--fd-border)',
+      }}>
+        <span style={{ fontSize: '20px' }}>{meta.icon}</span>
+        <div>
+          <h2 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            margin: 0,
+            color: 'var(--fd-foreground)',
+          }}>
+            {meta.label}
+            <span style={{
+              marginLeft: '8px',
+              fontSize: '14px',
+              fontWeight: '400',
+              color: 'var(--fd-muted-foreground)',
+            }}>
+              ({units.length})
+            </span>
+          </h2>
+          <p style={{
+            fontSize: '13px',
+            color: 'var(--fd-muted-foreground)',
+            margin: 0,
+          }}>
+            {meta.description}
+          </p>
+        </div>
+      </div>
+      <div className="previews-grid">
+        {units.map((unit) => {
+          // Extract full path name from route (e.g., "/_preview/components/button" -> "components/button")
+          const fullName = unit.route.replace(/^\/_preview\//, '')
+          return (
+            <PreviewCard
+              key={fullName}
+              name={fullName}
+              title={unit.config?.title}
+              status={unit.config?.status}
+            />
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// Previews catalog - Storybook-like gallery with categorized sections
 function PreviewsCatalog() {
-  if (!previews || previews.length === 0) {
+  // Use previewUnits for categorization, fall back to legacy previews
+  const units = previewUnits || []
+  const legacyPreviews = previews || []
+
+  // If no units but have legacy previews, convert them
+  const allUnits: PreviewUnit[] = units.length > 0 ? units : legacyPreviews.map((p: { name: string; route: string }) => ({
+    type: 'component' as PreviewType,
+    name: p.name,
+    path: '',
+    route: p.route,
+    config: null,
+    files: { index: '' },
+  }))
+
+  if (allUnits.length === 0) {
     return (
       <div style={{ padding: '40px 20px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
@@ -115,24 +227,30 @@ function PreviewsCatalog() {
     )
   }
 
+  const grouped = groupByType(allUnits)
+  const totalCount = allUnits.length
+
   return (
     <div className="previews-catalog">
-      <div style={{ marginBottom: '24px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>
           Previews
         </h1>
         <p style={{ color: 'var(--fd-muted-foreground)', margin: 0 }}>
-          {previews.length} component preview{previews.length !== 1 ? 's' : ''} available.
+          {totalCount} preview{totalCount !== 1 ? 's' : ''} across {grouped.size} categor{grouped.size !== 1 ? 'ies' : 'y'}.
           Click any preview to open it.
         </p>
       </div>
 
-      <div className="previews-grid">
-        {previews.map((preview: { name: string; route: string }) => (
-          <PreviewCard key={preview.name} name={preview.name} />
-        ))}
-      </div>
+      {/* Categorized sections */}
+      {CATEGORY_ORDER.map((type) => {
+        const units = grouped.get(type)
+        if (!units || units.length === 0) return null
+        return <CategorySection key={type} type={type} units={units} />
+      })}
 
+      {/* Tip */}
       <div style={{
         marginTop: '32px',
         padding: '14px 16px',
@@ -154,7 +272,7 @@ function PreviewsCatalog() {
 // Individual preview card - clickable thumbnail with WASM preview communication
 import type { PreviewConfig, PreviewMessage } from '../preview-runtime/types'
 
-function PreviewCard({ name }: { name: string }) {
+function PreviewCard({ name, title, status }: { name: string; title?: string; status?: 'draft' | 'stable' | 'deprecated' }) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null)
   const [isLoaded, setIsLoaded] = React.useState(false)
   const [loadError, setLoadError] = React.useState(false)
@@ -255,7 +373,22 @@ function PreviewCard({ name }: { name: string }) {
       </div>
       {/* Card footer */}
       <div className="preview-card-footer">
-        <h3 className="preview-card-title">{name}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 className="preview-card-title">{title || name}</h3>
+          {status && status !== 'stable' && (
+            <span style={{
+              fontSize: '10px',
+              fontWeight: '500',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              backgroundColor: status === 'draft' ? 'var(--fd-warning-background, #fef3c7)' : 'var(--fd-muted)',
+              color: status === 'draft' ? 'var(--fd-warning-foreground, #92400e)' : 'var(--fd-muted-foreground)',
+              textTransform: 'uppercase',
+            }}>
+              {status}
+            </span>
+          )}
+        </div>
         <code className="preview-card-path">previews/{name}/</code>
       </div>
     </Link>
@@ -329,6 +462,13 @@ const previewDetailRoute = createRoute({
   component: PreviewPage,
 })
 
+// Tokens showcase route (design system tokens reference)
+const tokensRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/_prev/tokens',
+  component: TokensPage,
+})
+
 // Check if we have an index page (route '/')
 const hasIndexPage = pages.some((page: { route: string }) => page.route === '/')
 const firstPage = pages[0] as { route: string; file: string; title?: string; description?: string; frontmatter?: Record<string, unknown> } | undefined
@@ -370,6 +510,7 @@ const previewsRouteWithChildren = previewsLayoutRoute.addChildren([
 
 const routeTree = rootRoute.addChildren([
   previewsRouteWithChildren,
+  tokensRoute,
   ...(indexRedirectRoute ? [indexRedirectRoute] : []),
   ...pageRoutes,
 ])

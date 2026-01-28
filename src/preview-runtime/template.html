@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Preview</title>
+  <!-- Preload React for faster module resolution -->
+  <link rel="modulepreload" href="https://esm.sh/react@18">
+  <link rel="modulepreload" href="https://esm.sh/react-dom@18/client">
+  <link rel="modulepreload" href="https://esm.sh/react@18/jsx-runtime">
   <!-- Tailwind CSS v4 Play CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <!-- esbuild-wasm -->
@@ -35,7 +39,14 @@
   <script type="module">
     // Preview runtime - bundles React/TSX in browser via esbuild-wasm
 
-    let initialized = false
+    // Global error handler to catch module errors
+    window.onerror = (msg, url, line, col, error) => {
+      document.getElementById('root').innerHTML = `<div class="preview-error">Error: ${msg}\n${url}:${line}:${col}</div>`
+      return false
+    }
+
+    let esbuildReady = null // Promise that resolves when esbuild is ready
+    let tokensReady = null // Promise that resolves with tokens data
     let lastConfig = null
 
     function getLoader(filePath) {
@@ -44,12 +55,18 @@
       return loaders[ext] || 'tsx'
     }
 
+    // Pre-initialize esbuild immediately on page load
+    esbuildReady = esbuild.initialize({
+      wasmURL: 'https://unpkg.com/esbuild-wasm@0.24.2/esbuild.wasm',
+    }).catch(err => {
+      console.error('Failed to initialize esbuild:', err)
+    })
+
+    // Pre-fetch tokens in parallel
+    tokensReady = fetch('/_prev/tokens.json').then(r => r.json()).catch(() => null)
+
     async function initEsbuild() {
-      if (initialized) return
-      await esbuild.initialize({
-        wasmURL: 'https://unpkg.com/esbuild-wasm@0.24.2/esbuild.wasm',
-      })
-      initialized = true
+      await esbuildReady
     }
 
     async function bundle(config) {
@@ -76,16 +93,30 @@
         // Determine if entry exports default or needs wrapping
         const hasDefaultExport = /export\s+default/.test(entryFile.content)
 
+        // Wait for pre-fetched tokens
+        const tokens = await tokensReady
+
         const entryCode = hasDefaultExport ? `
           import React from 'react'
           import { createRoot } from 'react-dom/client'
+          import { setTokensConfig } from '@prev/jsx'
           import App from './${config.entry}'
+
+          // Inject pre-fetched tokens
+          const tokens = ${JSON.stringify(tokens)}
+          if (tokens) setTokensConfig(tokens)
 
           const root = createRoot(document.getElementById('root'))
           root.render(React.createElement(App))
         ` : `
           // Entry file doesn't export default, execute directly
-          import './${config.entry}'
+          import { setTokensConfig } from '@prev/jsx'
+
+          // Inject pre-fetched tokens
+          const tokens = ${JSON.stringify(tokens)}
+          if (tokens) setTokensConfig(tokens)
+
+          import('./${config.entry}')
         `
 
         const result = await esbuild.build({
@@ -114,9 +145,20 @@
                 return { path: url, external: true }
               })
 
+              // Resolve @prev/jsx to pre-bundled primitives
+              build.onResolve({ filter: /^@prev\/jsx$/ }, args => {
+                return { path: `${window.location.origin}/_prev/jsx.js`, external: true }
+              })
+
+              // Resolve @prev/components/* to pre-bundled components
+              build.onResolve({ filter: /^@prev\/components\/(.+)$/ }, args => {
+                const componentName = args.path.replace('@prev/components/', '')
+                return { path: `${window.location.origin}/_prev/components/${componentName}.js`, external: true }
+              })
+
               // Auto-resolve npm packages via esm.sh
               build.onResolve({ filter: /^[^./]/ }, args => {
-                if (args.path.startsWith('https://')) return
+                if (args.path.startsWith('https://') || args.path.startsWith('/')) return
                 return { path: `https://esm.sh/${args.path}`, external: true }
               })
 

@@ -1,6 +1,6 @@
 // src/vite/config.ts
 import type { InlineConfig, Logger } from 'vite'
-import { createLogger } from 'vite'
+import { createLogger, build as viteBuild } from 'vite'
 import react from '@vitejs/plugin-react'
 import mdx from '@mdx-js/rollup'
 import remarkGfm from 'remark-gfm'
@@ -13,10 +13,12 @@ import { existsSync, readFileSync } from 'fs'
 import { pagesPlugin } from './plugins/pages-plugin'
 import { entryPlugin } from './plugins/entry-plugin'
 import { previewsPlugin } from './plugins/previews-plugin'
+import { tokensPlugin } from './plugins/tokens-plugin'
 import { createConfigPlugin } from './plugins/config-plugin'
 import { debugPlugin } from './plugins/debug-plugin'
 import { buildPreviewConfig } from './previews'
 import { parseFlowDefinition, parseAtlasDefinition } from './config-parser'
+import * as esbuildLib from 'esbuild'
 
 // Type mapping for plural to singular (handles 'atlas' correctly)
 const TYPE_SINGULAR: Record<string, string> = {
@@ -208,6 +210,20 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
       pagesPlugin(rootDir, { include }),
       entryPlugin(rootDir),
       previewsPlugin(rootDir),
+      tokensPlugin(rootDir),
+      // User tokens plugin - detects previews/tokens.yaml
+      {
+        name: 'prev-user-tokens',
+        configResolved() {
+          const userTokensPath = path.join(rootDir, 'previews/tokens.yaml')
+          if (existsSync(userTokensPath)) {
+            // Store path globally for resolver to access
+            ;(globalThis as any).__PREV_USER_TOKENS_PATH = userTokensPath
+          } else {
+            ;(globalThis as any).__PREV_USER_TOKENS_PATH = null
+          }
+        }
+      },
       // API endpoint for config updates (drag-and-drop reordering)
       {
         name: 'prev-config-api',
@@ -268,6 +284,190 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
           }
         }
       },
+      // Serve pre-bundled @prev/jsx for preview runtime
+      {
+        name: 'prev-jsx-bundle',
+        configureServer(server) {
+          let cachedBundle: string | null = null
+
+          server.middlewares.use('/_prev/jsx.js', async (req, res, next) => {
+            if (req.method !== 'GET') return next()
+
+            try {
+              // Build bundle on first request
+              if (!cachedBundle) {
+                const jsxEntry = path.join(srcRoot, 'jsx/index.ts')
+                const result = await viteBuild({
+                  logLevel: 'silent',
+                  define: {
+                    'process.env.NODE_ENV': '"production"',
+                  },
+                  esbuild: {
+                    jsx: 'automatic',
+                    jsxImportSource: 'react',
+                    // Use production jsx runtime (not jsxDEV)
+                    jsxDev: false,
+                  },
+                  build: {
+                    write: false,
+                    lib: {
+                      entry: jsxEntry,
+                      formats: ['es'],
+                      fileName: 'jsx',
+                    },
+                    rollupOptions: {
+                      external: ['react', 'react-dom', 'react/jsx-runtime', 'zod'],
+                      output: {
+                        globals: {
+                          react: 'React',
+                          'react-dom': 'ReactDOM',
+                        },
+                      },
+                    },
+                    minify: false,
+                  },
+                })
+
+                // Get the bundled code
+                const output = Array.isArray(result) ? result[0] : result
+                if (!('output' in output)) {
+                  throw new Error('Unexpected build result type')
+                }
+                const jsFile = output.output.find((f) => f.type === 'chunk')
+                if (jsFile && 'code' in jsFile) {
+                  // Replace external imports with esm.sh URLs
+                  cachedBundle = jsFile.code
+                    .replace(/from\s+['"]react\/jsx-runtime['"]/g, 'from "https://esm.sh/react@18/jsx-runtime"')
+                    .replace(/from\s+['"]react['"]/g, 'from "https://esm.sh/react@18"')
+                    .replace(/from\s+['"]react-dom['"]/g, 'from "https://esm.sh/react-dom@18"')
+                    .replace(/from\s+['"]zod['"]/g, 'from "https://esm.sh/zod"')
+                }
+              }
+
+              if (cachedBundle) {
+                res.setHeader('Content-Type', 'application/javascript')
+                res.setHeader('Cache-Control', 'no-cache')
+                res.end(cachedBundle)
+                return
+              }
+
+              res.statusCode = 500
+              res.end('Failed to bundle jsx primitives')
+            } catch (err) {
+              console.error('Error bundling jsx:', err)
+              res.statusCode = 500
+              res.end(String(err))
+            }
+          })
+
+          // Invalidate cache on jsx file changes
+          server.watcher.on('change', (file) => {
+            if (file.includes('/jsx/')) {
+              cachedBundle = null
+            }
+          })
+        },
+      },
+      // Serve pre-bundled @prev/components/* for preview runtime
+      {
+        name: 'prev-components-bundle',
+        configureServer(server) {
+          const componentCache = new Map<string, string>()
+
+          server.middlewares.use(async (req, res, next) => {
+            const urlPath = req.url?.split('?')[0] || ''
+
+            // Match /_prev/components/{name}.js
+            const match = urlPath.match(/^\/_prev\/components\/([^/]+)\.js$/)
+            if (!match || req.method !== 'GET') return next()
+
+            const componentName = match[1]
+            const componentEntry = path.join(rootDir, 'previews/components', componentName, 'index.tsx')
+
+            // Check if component exists
+            if (!existsSync(componentEntry)) {
+              res.statusCode = 404
+              res.end(`Component not found: ${componentName}`)
+              return
+            }
+
+            try {
+              // Check cache
+              let bundledCode = componentCache.get(componentName)
+
+              if (!bundledCode) {
+                const result = await viteBuild({
+                  logLevel: 'silent',
+                  define: {
+                    'process.env.NODE_ENV': '"production"',
+                  },
+                  esbuild: {
+                    jsx: 'automatic',
+                    jsxImportSource: 'react',
+                    jsxDev: false,
+                  },
+                  build: {
+                    write: false,
+                    lib: {
+                      entry: componentEntry,
+                      formats: ['es'],
+                      fileName: componentName,
+                    },
+                    rollupOptions: {
+                      external: ['react', 'react-dom', 'react/jsx-runtime', '@prev/jsx'],
+                      output: {
+                        globals: {
+                          react: 'React',
+                          'react-dom': 'ReactDOM',
+                        },
+                      },
+                    },
+                    minify: false,
+                  },
+                })
+
+                const output = Array.isArray(result) ? result[0] : result
+                if (!('output' in output)) {
+                  throw new Error('Unexpected build result type')
+                }
+                const jsFile = output.output.find((f) => f.type === 'chunk')
+                if (jsFile && 'code' in jsFile) {
+                  bundledCode = jsFile.code
+                    .replace(/from\s+['"]react\/jsx-runtime['"]/g, 'from "https://esm.sh/react@18/jsx-runtime"')
+                    .replace(/from\s+['"]react['"]/g, 'from "https://esm.sh/react@18"')
+                    .replace(/from\s+['"]react-dom['"]/g, 'from "https://esm.sh/react-dom@18"')
+                    .replace(/from\s+['"]@prev\/jsx['"]/g, `from "${req.headers.origin || ''}/_prev/jsx.js"`)
+                  componentCache.set(componentName, bundledCode)
+                }
+              }
+
+              if (bundledCode) {
+                res.setHeader('Content-Type', 'application/javascript')
+                res.setHeader('Cache-Control', 'no-cache')
+                res.end(bundledCode)
+                return
+              }
+
+              res.statusCode = 500
+              res.end(`Failed to bundle component: ${componentName}`)
+            } catch (err) {
+              console.error(`Error bundling component ${componentName}:`, err)
+              res.statusCode = 500
+              res.end(String(err))
+            }
+          })
+
+          // Invalidate cache on component file changes
+          server.watcher.on('change', (file) => {
+            if (file.includes('/previews/components/')) {
+              const match = file.match(/\/previews\/components\/([^/]+)\//)
+              if (match) {
+                componentCache.delete(match[1])
+              }
+            }
+          })
+        },
+      },
       // Custom plugin for serving WASM-based preview routes
       {
         name: 'prev-preview-server',
@@ -290,9 +490,77 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
           server.middlewares.use(async (req, res, next) => {
             const urlPath = req.url?.split('?')[0] || ''
 
-            // Serve WASM preview runtime template
+            // Fast server-side bundle endpoint (replaces slow browser WASM)
+            if (urlPath.startsWith('/_preview-bundle/')) {
+              const startTime = performance.now()
+              const previewPath = decodeURIComponent(urlPath.slice('/_preview-bundle/'.length))
+              const previewDir = path.join(rootDir, 'previews', previewPath)
+
+              if (!previewDir.startsWith(path.join(rootDir, 'previews'))) {
+                res.statusCode = 403
+                res.end('Forbidden')
+                return
+              }
+
+              // Find entry file
+              const entryFiles = ['index.tsx', 'index.ts', 'index.jsx', 'index.js', 'App.tsx', 'App.ts']
+              let entryFile = ''
+              for (const f of entryFiles) {
+                if (existsSync(path.join(previewDir, f))) {
+                  entryFile = path.join(previewDir, f)
+                  break
+                }
+              }
+
+              if (!entryFile) {
+                res.statusCode = 404
+                res.end(JSON.stringify({ error: 'No entry file found' }))
+                return
+              }
+
+              try {
+                // Bundle with native esbuild (super fast!)
+                // Rewrite imports to use esm.sh URLs for browser compatibility
+                const result = await esbuildLib.build({
+                  entryPoints: [entryFile],
+                  bundle: true,
+                  write: false,
+                  format: 'esm',
+                  jsx: 'automatic',
+                  jsxImportSource: 'react',
+                  target: 'es2020',
+                  minify: false,
+                  sourcemap: false,
+                  external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', '@prev/jsx', 'fs', 'path', 'js-yaml'],
+                  alias: {
+                    'react': 'https://esm.sh/react@18',
+                    'react-dom': 'https://esm.sh/react-dom@18',
+                    'react-dom/client': 'https://esm.sh/react-dom@18/client',
+                    'react/jsx-runtime': 'https://esm.sh/react@18/jsx-runtime',
+                  },
+                  define: {
+                    'process.env.NODE_ENV': '"development"',
+                  },
+                })
+
+                const bundleTime = Math.round(performance.now() - startTime)
+                const code = result.outputFiles[0]?.text || ''
+
+                res.setHeader('Content-Type', 'application/javascript')
+                res.setHeader('X-Bundle-Time', String(bundleTime))
+                res.end(code)
+                return
+              } catch (err) {
+                console.error('Bundle error:', err)
+                res.statusCode = 500
+                res.end(JSON.stringify({ error: String(err) }))
+                return
+              }
+            }
+
+            // Serve fast preview runtime template (uses server-side bundling)
             if (urlPath === '/_preview-runtime') {
-              const templatePath = path.join(srcRoot, 'preview-runtime/template.html')
+              const templatePath = path.join(srcRoot, 'preview-runtime/fast-template.html')
               if (existsSync(templatePath)) {
                 const html = readFileSync(templatePath, 'utf-8')
                 res.setHeader('Content-Type', 'text/html')
@@ -312,37 +580,46 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
 
               if (multiTypeMatch) {
                 const [, type, name] = multiTypeMatch
-                // URL already contains plural form (flows, atlas), use directly
-                const configPathYaml = path.join(previewsDir, type, name, 'index.yaml')
-                const configPathYml = path.join(previewsDir, type, name, 'index.yml')
-                const configPath = existsSync(configPathYaml) ? configPathYaml : configPathYml
+                const previewDir = path.join(previewsDir, type, name)
 
                 // Security: prevent path traversal
-                if (!configPath.startsWith(previewsDir)) {
+                if (!previewDir.startsWith(previewsDir)) {
                   res.statusCode = 403
                   res.end('Forbidden')
                   return
                 }
 
-                if (existsSync(configPath)) {
+                // Check if preview directory exists
+                if (existsSync(previewDir)) {
                   try {
                     if (type === 'flows') {
-                      const flow = await parseFlowDefinition(configPath)
-                      if (flow) {
-                        res.setHeader('Content-Type', 'application/json')
-                        res.end(JSON.stringify(flow))
-                        return
+                      // Flows use index.yaml/yml
+                      const configPathYaml = path.join(previewDir, 'index.yaml')
+                      const configPathYml = path.join(previewDir, 'index.yml')
+                      const configPath = existsSync(configPathYaml) ? configPathYaml : configPathYml
+                      if (existsSync(configPath)) {
+                        const flow = await parseFlowDefinition(configPath)
+                        if (flow) {
+                          res.setHeader('Content-Type', 'application/json')
+                          res.end(JSON.stringify(flow))
+                          return
+                        }
                       }
                     } else if (type === 'atlas') {
-                      const atlas = await parseAtlasDefinition(configPath)
-                      if (atlas) {
-                        res.setHeader('Content-Type', 'application/json')
-                        res.end(JSON.stringify(atlas))
-                        return
+                      // Atlas uses index.yaml/yml
+                      const configPathYaml = path.join(previewDir, 'index.yaml')
+                      const configPathYml = path.join(previewDir, 'index.yml')
+                      const configPath = existsSync(configPathYaml) ? configPathYaml : configPathYml
+                      if (existsSync(configPath)) {
+                        const atlas = await parseAtlasDefinition(configPath)
+                        if (atlas) {
+                          res.setHeader('Content-Type', 'application/json')
+                          res.end(JSON.stringify(atlas))
+                          return
+                        }
                       }
                     } else {
-                      // For components/screens, use legacy buildPreviewConfig
-                      const previewDir = path.join(previewsDir, type, name)
+                      // For components/screens, use buildPreviewConfig to scan files
                       const config = await buildPreviewConfig(previewDir)
                       res.setHeader('Content-Type', 'application/json')
                       res.end(JSON.stringify(config))
