@@ -5,6 +5,7 @@ import { load as parseYaml } from 'js-yaml'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { mergeTokenConfigs } from './utils'
+import { DEFAULT_TOKENS } from './defaults'
 
 /**
  * Token configuration interface matching shadcn design system
@@ -111,17 +112,10 @@ function loadPartialTokens(filePath: string): PartialTokensConfig {
 }
 
 /**
- * Get the path to the bundled defaults.yaml
- */
-function getDefaultsPath(): string {
-  return join(import.meta.dir, 'defaults.yaml')
-}
-
-/**
  * Resolve tokens by merging defaults with user overrides
  *
  * Resolution order (later wins):
- * 1. Bundled defaults.yaml
+ * 1. Bundled default tokens
  * 2. User tokens from file (if userTokensPath provided)
  * 3. Inline user tokens (if userTokens provided)
  *
@@ -137,8 +131,8 @@ export function resolveTokens(options: ResolveTokensOptions = {}): TokensConfig 
     userTokensPath = (globalThis as any).__PREV_USER_TOKENS_PATH
   }
 
-  // Load defaults
-  const defaults = loadTokens(defaultsPath ?? getDefaultsPath())
+  // Load defaults - use inline defaults or load from file if path provided
+  const defaults = defaultsPath ? loadTokens(defaultsPath) : DEFAULT_TOKENS
 
   // Start with defaults
   let resolved: TokensConfig = { ...defaults }
