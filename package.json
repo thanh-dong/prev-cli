@@ -34,7 +34,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "bun build src/cli.ts --outdir dist --target bun --packages external && tsc --emitDeclarationOnly",
+    "build": "bun build src/cli.ts --outdir dist --target bun --packages external --banner 'if(typeof globalThis.Bun===\"undefined\"){console.error(\"\\n\\x1b[31mError: prev-cli requires Bun runtime\\x1b[0m\\n\\nYou are running with Node.js, but prev-cli uses Bun-specific APIs.\\n\\n\\x1b[33mTo install and run with Bun:\\x1b[0m\\n\\n  # Global install (recommended)\\n  bun i -g prev-cli\\n  prev-cli dev\\n\\n  # Or local install\\n  bun add -d prev-cli\\n  bunx --bun prev-cli dev\\n\\n\\x1b[90mLearn more: https://bun.sh/docs/installation\\x1b[0m\\n\");process.exit(1)}' && tsc --emitDeclarationOnly",
     "build:docs": "bun run build && bun ./dist/cli.js build",
     "prepublishOnly": "bun run build",
     "dev": "tsc --watch",
