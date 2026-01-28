@@ -21,8 +21,8 @@ function CardDescription({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-stone-600 dark:text-stone-400">{children}</p>
 }
 
-function CardContent({ children }: { children: React.ReactNode }) {
-  return <div className="p-6 pt-0">{children}</div>
+function CardContent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>
 }
 
 function CardFooter({ children }: { children: React.ReactNode }) {

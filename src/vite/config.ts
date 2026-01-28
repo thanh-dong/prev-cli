@@ -528,6 +528,9 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
                   format: 'esm',
                   jsx: 'automatic',
                   jsxImportSource: 'react',
+                  // Use production jsx runtime (jsx/jsxs) not development (jsxDEV)
+                  // esm.sh only provides jsx-runtime, not jsx-dev-runtime
+                  jsxDev: false,
                   target: 'es2020',
                   minify: false,
                   sourcemap: false,
@@ -539,7 +542,7 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
                     'react/jsx-runtime': 'https://esm.sh/react@18/jsx-runtime',
                   },
                   define: {
-                    'process.env.NODE_ENV': '"development"',
+                    'process.env.NODE_ENV': '"production"',
                   },
                 })
 
