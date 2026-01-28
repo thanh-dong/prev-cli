@@ -1,9 +1,12 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { parseArgs } from 'util'
 import path from 'path'
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { startDev, buildSite, previewSite } from './vite/start'
+import { validate, formatValidationResult } from './validators'
+import { typecheck, formatTypecheckResult } from './typecheck'
+import { migrateConfigs, formatMigrationResult } from './migrate'
 import { cleanCache, getCacheDir } from './utils/cache'
 import { loadConfig, saveConfig, findConfigFile, defaultConfig } from './config'
 import yaml from 'js-yaml'
@@ -31,6 +34,7 @@ const { values, positionals } = parseArgs({
     days: { type: 'string', short: 'd' },
     cwd: { type: 'string', short: 'c' },
     base: { type: 'string', short: 'b' },
+    renderer: { type: 'string', short: 'r' },
     debug: { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' }
@@ -53,6 +57,9 @@ Usage:
   prev [options]              Start development server
   prev build [options]        Build for production
   prev preview [options]      Preview production build
+  prev validate [options]     Validate preview configs
+  prev typecheck [options]    Type check preview TSX files
+  prev migrate                Migrate configs from v1 to v2 format
   prev create [name]          Create preview in previews/<name>/ (default: "example")
   prev config [subcommand]    Manage configuration
   prev clearcache             Clear Vite cache (.vite directory)
@@ -68,6 +75,7 @@ Options:
   -c, --cwd <path>       Set working directory
   -p, --port <port>      Specify port (dev/preview)
   -b, --base <path>      Base path for deployment (e.g., /repo-name/ for GitHub Pages)
+  -r, --renderer <name>  Target renderer for validate command (e.g., react, html)
   -d, --days <days>      Cache age threshold for clean (default: 30)
   --debug                Write debug trace to .prev-debug/ for performance analysis
   -h, --help             Show this help message
@@ -103,35 +111,46 @@ Configuration (.prev.yaml):
 
   Drag pages in the TOC panel to reorder - changes auto-save to config.
 
-Previews:
-  Previews must be in the previews/ directory at your project root.
-  Each preview is a subfolder with React components:
+Previews (Renderer-Agnostic):
+  Previews are renderer-agnostic configurations in previews/ directory:
 
-    previews/                # Required location
-      my-demo/               # Preview name (used in <Preview src="...">)
-        App.tsx              # React component (entry point)
-        styles.css           # Optional CSS
+    previews/                       # Required location
+      components/{id}/config.yaml   # Reusable UI components
+      screens/{id}/config.yaml      # Full-page views with states
+      flows/{id}/config.yaml        # Multi-step user journeys
+      atlas/{id}/config.yaml        # Information architecture
+
+  Example screen config (config.yaml):
+    kind: screen
+    id: login
+    title: Login Screen
+    schemaVersion: "2.0"
+    states:
+      default: { description: "Initial state" }
+      error: { description: "Validation error" }
+    layoutByRenderer:
+      react:
+        - type: ComponentRef
+          ref: components/form
+          props: { variant: "login" }
+      html:
+        - type: Container
+          children:
+            - type: Text
+              content: "Login Form"
 
   Then embed in MDX:
     import { Preview } from '@prev/theme'
+    <Preview src="screens/login" />
+    <Preview src="screens/login" state="error" />
 
-    <Preview src="my-demo" />
-    <Preview src="my-demo" height={600} />
-    <Preview src="my-demo" title="Counter Demo" />
+  Config Schema Versions:
+    - v1 (transitional): kind optional, inferred from directory
+    - v2 (strict): kind, id, schemaVersion required
 
-  Preview props:
-    src      Required. Name of the preview folder
-    height   Iframe height in pixels (default: 400)
-    title    Display title (default: folder name)
-
-  DevTools (floating pill in preview):
-    - Device modes: mobile (375px), tablet (768px), desktop
-    - Custom width slider (320-1920px)
-    - Dark mode toggle
-    - Fullscreen mode
-
-  Previews are bundled via esbuild-wasm in dev, and pre-compiled
-  to standalone HTML files in production builds.
+  Supported Renderers:
+    - react: React components with hydration
+    - html: Static HTML without JavaScript
 
   Browse all previews at /previews (Storybook-like catalog).
 
@@ -139,6 +158,9 @@ Examples:
   prev                       Start dev server on random port
   prev -p 3000               Start dev server on port 3000
   prev build                 Build static site to ./dist
+  prev validate              Validate all preview configs
+  prev validate -r react     Validate only react renderer layouts
+  prev migrate               Upgrade configs to v2 format (adds kind, schemaVersion)
   prev create                Create example preview in previews/example/
   prev create my-demo        Create preview in previews/my-demo/
   prev clean -d 7            Remove caches older than 7 days
@@ -479,6 +501,34 @@ async function main() {
 
       case 'config':
         handleConfig(rootDir, positionals[1])
+        break
+
+      case 'validate':
+        const validationResult = await validate(rootDir, {
+          renderer: values.renderer,
+        })
+        console.log(formatValidationResult(validationResult))
+        if (!validationResult.valid) {
+          process.exit(1)
+        }
+        break
+
+      case 'migrate':
+        const migrationResult = await migrateConfigs(rootDir)
+        console.log(formatMigrationResult(migrationResult))
+        if (!migrationResult.success) {
+          process.exit(1)
+        }
+        break
+
+      case 'typecheck':
+        const typecheckResult = await typecheck(rootDir, {
+          verbose: values.debug,
+        })
+        console.log(formatTypecheckResult(typecheckResult))
+        if (!typecheckResult.success) {
+          process.exit(1)
+        }
         break
 
       default:
