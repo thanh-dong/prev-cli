@@ -2,7 +2,7 @@ import { Input } from '../../components/input'
 import { Button } from '../../components/button'
 import { brand, colors } from '../../shared/data'
 
-export default function Login() {
+export default function LoginError() {
   return (
     <div style={{
       minHeight: '100vh',
@@ -44,9 +44,23 @@ export default function Login() {
           Sign in to continue to {brand.name}
         </p>
 
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: 8,
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <span style={{ color: colors.error }}>⚠</span>
+          <span style={{ fontSize: 14, color: '#991b1b' }}>Invalid email or password. Please try again.</span>
+        </div>
+
         <form style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <Input label="Email" type="email" placeholder="you@example.com" />
-          <Input label="Password" type="password" placeholder="Enter your password" />
+          <Input label="Email" type="email" placeholder="you@example.com" state="error" />
+          <Input label="Password" type="password" placeholder="Enter your password" state="error" />
           <Button variant="primary">Sign In</Button>
         </form>
 

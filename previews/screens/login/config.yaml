@@ -1,6 +1,10 @@
+kind: screen
+id: login
 title: Login
-description: User authentication screen with form
-tags: [screen, auth, form]
+description: User authentication with Workflow branding
 status: stable
-category: screens
-order: 2
+schemaVersion: "2.0"
+tags: [screen, auth, form]
+states:
+  default: { description: "Login form ready for input" }
+  error: { description: "Invalid credentials error" }
