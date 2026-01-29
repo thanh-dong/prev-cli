@@ -96,13 +96,61 @@ export async function buildJsxBundle(vendorPath: string): Promise<VendorBundleRe
     const minimalJsx = `
       import * as React from 'react'
 
+      // Default token values for standalone preview rendering
+      const defaultTokens = {
+        background: {
+          primary: '#3b82f6',
+          secondary: '#f1f5f9',
+          destructive: '#ef4444',
+          muted: '#f1f5f9',
+          accent: '#f1f5f9',
+          transparent: 'transparent',
+        },
+        color: {
+          'primary-foreground': '#ffffff',
+          'secondary-foreground': '#0f172a',
+          'destructive-foreground': '#ffffff',
+          'muted-foreground': '#64748b',
+          'accent-foreground': '#0f172a',
+          foreground: '#0f172a',
+        },
+        spacing: {
+          xs: '4px',
+          sm: '8px',
+          md: '12px',
+          lg: '16px',
+          xl: '24px',
+        },
+        radius: {
+          none: '0',
+          sm: '4px',
+          md: '6px',
+          lg: '8px',
+          full: '9999px',
+        },
+        'typography.size': {
+          xs: '12px',
+          sm: '14px',
+          base: '16px',
+          lg: '18px',
+          xl: '20px',
+        },
+        'typography.weight': {
+          normal: '400',
+          medium: '500',
+          semibold: '600',
+          bold: '700',
+        },
+      }
+
       // Token resolution
       let tokensConfig = null
       export function setTokensConfig(config) { tokensConfig = config }
 
       function resolveToken(category, token) {
-        if (!tokensConfig) return token
-        const cat = tokensConfig[category]
+        // Check custom config first, then defaults
+        const config = tokensConfig || defaultTokens
+        const cat = config[category]
         return cat?.[token] ?? token
       }
 
