@@ -400,6 +400,64 @@ function PreviewCard({ name, title, status }: { name: string; title?: string; st
 import { FlowPreview } from './previews/FlowPreview'
 import { AtlasPreview } from './previews/AtlasPreview'
 
+// Standalone preview embed (for iframe thumbnails in production)
+// Renders just the preview content without Layout wrapper
+function PreviewEmbed() {
+  const params = useParams({ strict: false })
+  const name = (params as any)['_splat'] || (params as any)['*'] || ''
+
+  // In production, always use pre-built static files
+  const isDev = import.meta.env?.DEV ?? false
+  const baseUrl = (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+
+  // Parse type from name (e.g., "flows/checkout" -> type="flow", unitName="checkout")
+  const match = name.match(/^(components|screens|flows|atlas)\/(.+)$/)
+  if (!match) {
+    // Fallback for legacy preview paths without type prefix
+    const previewUrl = isDev ? `/_preview-runtime?src=${name}` : `${baseUrl}/_preview/${name}/`
+    return (
+      <iframe
+        src={previewUrl}
+        style={{ width: '100%', height: '100vh', border: 'none' }}
+        title={name}
+      />
+    )
+  }
+
+  const [, typeFolder, unitName] = match
+  const type = typeFolder === 'flows' ? 'flow' : typeFolder === 'atlas' ? 'atlas' : typeFolder.slice(0, -1)
+
+  // Find the preview unit
+  const unit = previewUnits.find(u => u.type === type && u.name === unitName)
+
+  if (!unit) {
+    return (
+      <div style={{ padding: '32px', textAlign: 'center', color: '#888' }}>
+        Preview not found: {name}
+      </div>
+    )
+  }
+
+  // For flows and atlas, render the specialized component
+  if (unit.type === 'flow') {
+    return <FlowPreview unit={unit} />
+  }
+
+  if (unit.type === 'atlas') {
+    return <AtlasPreview unit={unit} />
+  }
+
+  // For components and screens, use iframe to load static HTML
+  const previewUrl = isDev ? `/_preview-runtime?src=${name}` : `${baseUrl}/_preview/${name}/`
+  return (
+    <iframe
+      src={previewUrl}
+      style={{ width: '100%', height: '100vh', border: 'none' }}
+      title={name}
+    />
+  )
+}
+
 function PreviewPage() {
   const params = useParams({ strict: false })
   // Splat param captures the full path after /previews/
@@ -497,6 +555,14 @@ const tokensRoute = createRoute({
   component: TokensPage,
 })
 
+// Standalone preview embed route (handles /_preview/flows/checkout, /_preview/atlas/app, etc.)
+// This is used when thumbnails load as iframes - the 404.html serves the SPA which matches this route
+const previewEmbedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/_preview/$',
+  component: PreviewEmbed,
+})
+
 // Check if we have an index page (route '/')
 const hasIndexPage = pages.some((page: { route: string }) => page.route === '/')
 const firstPage = pages[0] as { route: string; file: string; title?: string; description?: string; frontmatter?: Record<string, unknown> } | undefined
@@ -539,6 +605,7 @@ const previewsRouteWithChildren = previewsLayoutRoute.addChildren([
 const routeTree = rootRoute.addChildren([
   previewsRouteWithChildren,
   tokensRoute,
+  previewEmbedRoute,
   ...(indexRedirectRoute ? [indexRedirectRoute] : []),
   ...pageRoutes,
 ])
