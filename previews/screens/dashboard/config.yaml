@@ -1,6 +1,10 @@
+kind: screen
+id: dashboard
 title: Dashboard
-description: Main dashboard screen with stats and activity feed
-tags: [screen, dashboard, analytics]
+description: Project overview and recent activity
 status: stable
-category: screens
-order: 1
+schemaVersion: "2.0"
+tags: [screen, dashboard, overview]
+states:
+  default: { description: "Projects and activity displayed" }
+  empty: { description: "No projects yet" }
