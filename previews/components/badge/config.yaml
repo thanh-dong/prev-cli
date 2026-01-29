@@ -1,0 +1,7 @@
+kind: component
+id: badge
+title: Badge
+description: Status indicator with semantic variants
+status: stable
+schemaVersion: "2.0"
+tags: [component, status, indicator]
