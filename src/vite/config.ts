@@ -195,6 +195,9 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
         remarkPlugins: [remarkGfm],
         rehypePlugins: [rehypeHighlight],
         providerImportSource: '@mdx-js/react',
+        // Force production JSX to avoid _jsxDEV errors
+        // React's production build sets jsxDEV = undefined
+        development: false,
         // Only process MDX files in user's project root, not node_modules or other packages
         include: [
           path.join(rootDir, '**/*.md'),
@@ -766,10 +769,24 @@ export async function createViteConfig(options: ConfigOptions): Promise<InlineCo
       ]
     },
 
+    // Force esbuild to use production JSX runtime to avoid _jsxDEV errors
+    // React's production build sets jsxDEV = undefined, causing runtime errors
+    esbuild: {
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+      jsxDev: false,
+    },
+
     optimizeDeps: {
       // Minimum pre-bundling for CJS compatibility
       noDiscovery: true,
       holdUntilCrawlEnd: false,
+      // Force esbuild to use production JSX for pre-bundled deps
+      esbuildOptions: {
+        jsx: 'automatic',
+        jsxImportSource: 'react',
+        jsxDev: false,
+      },
       include: [
         'react-dom/client',
         'use-sync-external-store',
