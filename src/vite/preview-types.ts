@@ -133,6 +133,9 @@ export interface PreviewUnit {
 
 // Legacy FlowStep for backwards compatibility with existing index.yaml format
 export interface FlowStep {
+  id?: string
+  title?: string
+  description?: string
   screen: string
   state?: string
   note?: string

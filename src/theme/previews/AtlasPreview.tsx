@@ -74,6 +74,7 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('tree')
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isHovered, setIsHovered] = useState(false)
 
   // Load atlas definition - use config for static builds, fetch for dev
   useEffect(() => {
@@ -104,11 +105,27 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
   if (loading) {
     return (
       <div style={{
-        padding: '32px',
-        textAlign: 'center',
-        color: 'var(--fd-muted-foreground)',
+        padding: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--fd-card)',
+        borderRadius: '16px',
+        boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
       }}>
-        Loading atlas...
+        <div style={{
+          width: '32px',
+          height: '32px',
+          border: '2px solid var(--fd-border)',
+          borderTopColor: 'oklch(0.55 0.18 280)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     )
   }
@@ -116,25 +133,46 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
   if (!atlas || !atlas.hierarchy) {
     return (
       <div style={{
-        padding: '32px',
+        padding: '48px',
         textAlign: 'center',
-        color: 'oklch(0.65 0.15 85)',
+        backgroundColor: 'var(--fd-card)',
+        borderRadius: '16px',
+        border: '1px solid var(--fd-border)',
+        boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.08)',
       }}>
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: 'oklch(0.94 0.06 85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 16px',
+          fontSize: '24px',
+        }}>
+          ⚠
+        </div>
         <h2 style={{
           margin: '0 0 8px 0',
           fontSize: '18px',
           fontWeight: 600,
+          color: 'var(--fd-foreground)',
         }}>
           {unit.config?.title || unit.name}
         </h2>
-        <p style={{ margin: 0 }}>
+        <p style={{
+          margin: 0,
+          fontSize: '14px',
+          color: 'var(--fd-muted-foreground)',
+        }}>
           {atlas ? 'This atlas has no hierarchy defined.' : 'Failed to load atlas definition.'}
         </p>
       </div>
     )
   }
 
-  // Fix 8: Tree view with cycle detection
+  // Tree view with cycle detection
   const renderTree = (areaId: string, depth = 0, visited = new Set<string>()): React.ReactNode => {
     // Cycle detection
     if (visited.has(areaId)) {
@@ -142,13 +180,14 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
         <div
           key={`cycle-${areaId}-${depth}`}
           style={{
-            marginLeft: `${depth * 24}px`,
+            marginLeft: `${depth * 20}px`,
             padding: '8px 12px',
             color: 'oklch(0.65 0.20 25)',
-            fontSize: '14px',
+            fontSize: '13px',
+            fontStyle: 'italic',
           }}
         >
-          Cycle detected: {areaId}
+          ↻ Cycle detected: {areaId}
         </div>
       )
     }
@@ -160,20 +199,21 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
         <div
           key={`missing-${areaId}-${depth}`}
           style={{
-            marginLeft: `${depth * 24}px`,
+            marginLeft: `${depth * 20}px`,
             padding: '8px 12px',
             color: 'var(--fd-muted-foreground)',
-            fontSize: '14px',
+            fontSize: '13px',
             fontStyle: 'italic',
           }}
         >
-          Missing area: {areaId}
+          ⚠ Missing area: {areaId}
         </div>
       )
     }
 
     const hasChildren = area.children && area.children.length > 0
     const isSelected = selectedArea === areaId
+    const isRoot = depth === 0
 
     return (
       <div key={`${areaId}-${depth}`}>
@@ -182,23 +222,26 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            width: '100%',
+            gap: '10px',
+            width: `calc(100% - ${depth * 20}px)`,
             textAlign: 'left',
-            marginLeft: `${depth * 24}px`,
-            padding: '8px 12px',
+            marginLeft: `${depth * 20}px`,
+            padding: '10px 14px',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '8px',
             cursor: 'pointer',
-            backgroundColor: isSelected ? 'var(--fd-primary)' : 'transparent',
-            color: isSelected ? 'var(--fd-primary-foreground)' : 'var(--fd-foreground)',
+            backgroundColor: isSelected
+              ? 'oklch(0.55 0.18 280)'
+              : 'transparent',
+            color: isSelected ? 'white' : 'var(--fd-foreground)',
             fontSize: '14px',
-            fontWeight: isSelected ? 500 : 400,
-            transition: 'background-color 0.15s, color 0.15s',
+            fontWeight: isSelected ? 600 : isRoot ? 500 : 400,
+            transition: 'all 0.15s ease',
+            marginBottom: '2px',
           }}
           onMouseEnter={(e) => {
             if (!isSelected) {
-              e.currentTarget.style.backgroundColor = 'var(--fd-secondary)'
+              e.currentTarget.style.backgroundColor = 'var(--fd-muted)'
             }
           }}
           onMouseLeave={(e) => {
@@ -207,24 +250,56 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
             }
           }}
         >
+          {/* Node icon */}
           <span style={{
-            width: '16px',
-            textAlign: 'center',
-            color: isSelected ? 'var(--fd-primary-foreground)' : 'var(--fd-muted-foreground)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '24px',
+            height: '24px',
+            borderRadius: '6px',
+            backgroundColor: isSelected
+              ? 'rgba(255, 255, 255, 0.2)'
+              : isRoot
+                ? 'oklch(0.92 0.05 280)'
+                : 'var(--fd-muted)',
+            color: isSelected
+              ? 'white'
+              : isRoot
+                ? 'oklch(0.45 0.15 280)'
+                : 'var(--fd-muted-foreground)',
+            fontSize: '12px',
+            fontWeight: 600,
+            flexShrink: 0,
           }}>
-            {hasChildren ? (depth === 0 ? '/' : '+') : '-'}
+            {isRoot ? '◉' : hasChildren ? '◈' : '○'}
           </span>
-          <span>{area.title}</span>
+
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {area.title}
+          </span>
+
           {area.access && (
             <span style={{
-              marginLeft: 'auto',
-              padding: '2px 6px',
-              fontSize: '11px',
-              borderRadius: '3px',
+              padding: '3px 8px',
+              fontSize: '10px',
+              fontWeight: 500,
+              borderRadius: '4px',
               backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : 'var(--fd-muted)',
-              color: isSelected ? 'var(--fd-primary-foreground)' : 'var(--fd-muted-foreground)',
+              color: isSelected ? 'white' : 'var(--fd-muted-foreground)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
             }}>
               {area.access}
+            </span>
+          )}
+
+          {hasChildren && (
+            <span style={{
+              color: isSelected ? 'rgba(255,255,255,0.6)' : 'var(--fd-muted-foreground)',
+              fontSize: '12px',
+            }}>
+              {area.children?.length}
             </span>
           )}
         </button>
@@ -246,23 +321,31 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
         display: 'flex',
         gap: '24px',
         padding: '24px',
-        backgroundColor: 'var(--fd-muted)',
+        backgroundColor: 'oklch(0.15 0.01 280)',
+        backgroundImage: `
+          linear-gradient(oklch(0.20 0.01 280) 1px, transparent 1px),
+          linear-gradient(90deg, oklch(0.20 0.01 280) 1px, transparent 1px)
+        `,
+        backgroundSize: '24px 24px',
         minHeight: '400px',
       }}>
         {/* Sidebar */}
         <div style={{
-          width: '280px',
+          width: '300px',
           flexShrink: 0,
-          backgroundColor: 'var(--fd-background)',
-          borderRadius: '8px',
+          backgroundColor: 'var(--fd-card)',
+          borderRadius: '12px',
           padding: '16px',
           overflow: 'auto',
+          boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.2)',
         }}>
           <h3 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
+            margin: '0 0 16px 0',
+            fontSize: '12px',
             fontWeight: 600,
-            color: 'var(--fd-foreground)',
+            color: 'var(--fd-muted-foreground)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
           }}>
             Areas
           </h3>
@@ -272,28 +355,51 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
         {/* Screen preview area */}
         <div style={{
           flex: 1,
-          backgroundColor: 'var(--fd-background)',
-          borderRadius: '8px',
+          backgroundColor: 'var(--fd-card)',
+          borderRadius: '12px',
           padding: '24px',
           display: 'flex',
           flexDirection: 'column',
+          boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.2)',
         }}>
           {selectedAreaData ? (
             <>
-              <div style={{ marginBottom: '16px' }}>
-                <h3 style={{
-                  margin: '0 0 4px 0',
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: 'var(--fd-foreground)',
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '8px',
                 }}>
-                  {selectedAreaData.title}
-                </h3>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, oklch(0.55 0.18 280) 0%, oklch(0.45 0.20 320) 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '16px',
+                  }}>
+                    ◉
+                  </div>
+                  <h3 style={{
+                    margin: 0,
+                    fontSize: '20px',
+                    fontWeight: 600,
+                    color: 'var(--fd-foreground)',
+                    letterSpacing: '-0.02em',
+                  }}>
+                    {selectedAreaData.title}
+                  </h3>
+                </div>
                 {selectedAreaData.description && (
                   <p style={{
                     margin: 0,
                     fontSize: '14px',
                     color: 'var(--fd-muted-foreground)',
+                    paddingLeft: '48px',
                   }}>
                     {selectedAreaData.description}
                   </p>
@@ -305,9 +411,11 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
                 <div>
                   <h4 style={{
                     margin: '0 0 12px 0',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    color: 'var(--fd-foreground)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'var(--fd-muted-foreground)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
                   }}>
                     Routes
                   </h4>
@@ -320,27 +428,41 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
                       <div
                         key={path}
                         style={{
-                          padding: '12px',
+                          padding: '14px 16px',
                           backgroundColor: 'var(--fd-muted)',
-                          borderRadius: '4px',
-                          fontSize: '14px',
+                          borderRadius: '8px',
+                          border: '1px solid var(--fd-border)',
+                          transition: 'border-color 0.15s ease',
                         }}
                       >
                         <div style={{
                           fontFamily: 'var(--fd-font-mono)',
-                          color: 'var(--fd-foreground)',
-                          marginBottom: '4px',
+                          color: 'oklch(0.55 0.18 280)',
+                          marginBottom: '6px',
+                          fontSize: '13px',
+                          fontWeight: 500,
                         }}>
                           {path}
                         </div>
                         <div style={{
                           display: 'flex',
-                          gap: '8px',
+                          gap: '12px',
                           color: 'var(--fd-muted-foreground)',
-                          fontSize: '13px',
+                          fontSize: '12px',
                         }}>
-                          <span>Screen: {route.screen}</span>
-                          {route.guard && <span>Guard: {route.guard}</span>}
+                          <span>Screen: <strong style={{ color: 'var(--fd-foreground)' }}>{route.screen}</strong></span>
+                          {route.guard && (
+                            <span style={{
+                              padding: '2px 6px',
+                              backgroundColor: 'oklch(0.94 0.08 25)',
+                              color: 'oklch(0.50 0.15 25)',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 500,
+                            }}>
+                              {route.guard}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -350,11 +472,26 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
                 <div style={{
                   flex: 1,
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--fd-muted-foreground)',
                   fontSize: '14px',
+                  padding: '40px',
                 }}>
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--fd-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '12px',
+                    fontSize: '20px',
+                  }}>
+                    ∅
+                  </div>
                   No routes defined for this area
                 </div>
               )}
@@ -363,11 +500,25 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
             <div style={{
               flex: 1,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--fd-muted-foreground)',
               fontSize: '14px',
             }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--fd-muted)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '12px',
+                fontSize: '20px',
+              }}>
+                ←
+              </div>
               Select an area to view details
             </div>
           )}
@@ -385,18 +536,37 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'var(--fd-muted)',
+        backgroundColor: 'oklch(0.15 0.01 280)',
+        backgroundImage: `
+          radial-gradient(circle at 20% 30%, oklch(0.25 0.08 280 / 0.3) 0%, transparent 50%),
+          radial-gradient(circle at 80% 70%, oklch(0.25 0.08 320 / 0.3) 0%, transparent 50%)
+        `,
         minHeight: '400px',
       }}>
         <div style={{
-          padding: '24px 32px',
-          backgroundColor: 'var(--fd-background)',
-          borderRadius: '8px',
+          padding: '32px 48px',
+          backgroundColor: 'var(--fd-card)',
+          borderRadius: '16px',
           textAlign: 'center',
+          boxShadow: '0 8px 32px -8px rgba(0, 0, 0, 0.3)',
         }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, oklch(0.55 0.18 280) 0%, oklch(0.45 0.20 320) 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 16px',
+            fontSize: '28px',
+            color: 'white',
+          }}>
+            ◇
+          </div>
           <h3 style={{
             margin: '0 0 8px 0',
-            fontSize: '16px',
+            fontSize: '18px',
             fontWeight: 600,
             color: 'var(--fd-foreground)',
           }}>
@@ -419,12 +589,23 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
     return (
       <div style={{
         padding: '24px',
-        backgroundColor: 'var(--fd-muted)',
+        backgroundColor: 'oklch(0.15 0.01 280)',
+        backgroundImage: `
+          linear-gradient(oklch(0.20 0.01 280) 1px, transparent 1px),
+          linear-gradient(90deg, oklch(0.20 0.01 280) 1px, transparent 1px)
+        `,
+        backgroundSize: '24px 24px',
+        display: 'flex',
+        justifyContent: 'center',
+        minHeight: '350px',
       }}>
         <div style={{
-          backgroundColor: 'var(--fd-background)',
-          borderRadius: '8px',
-          padding: '16px',
+          width: '100%',
+          maxWidth: '500px',
+          backgroundColor: 'var(--fd-card)',
+          borderRadius: '12px',
+          padding: '20px',
+          boxShadow: '0 8px 32px -8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)',
         }}>
           {renderTree(atlas.hierarchy.root)}
         </div>
@@ -432,86 +613,112 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
     )
   }
 
-  const viewModeButtons: { mode: ViewMode; label: string }[] = [
-    { mode: 'tree', label: 'Tree' },
-    { mode: 'map', label: 'Map' },
-    { mode: 'navigate', label: 'Navigate' },
+  const viewModeButtons: { mode: ViewMode; label: string; icon: string }[] = [
+    { mode: 'tree', label: 'Tree', icon: '⊞' },
+    { mode: 'map', label: 'Map', icon: '◇' },
+    { mode: 'navigate', label: 'Navigate', icon: '⇢' },
   ]
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      border: '1px solid var(--fd-border)',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      backgroundColor: 'var(--fd-background)',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        backgroundColor: 'var(--fd-card)',
+        boxShadow: isHovered
+          ? '0 20px 40px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+          : '0 4px 20px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+        transition: 'box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: isHovered ? 'translateY(-2px)' : 'none',
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       {/* Header */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 16px',
-        backgroundColor: 'var(--fd-muted)',
+        padding: '20px 24px',
+        background: 'linear-gradient(to bottom, var(--fd-card), var(--fd-muted))',
         borderBottom: '1px solid var(--fd-border)',
       }}>
-        <div>
-          <h2 style={{
-            margin: 0,
-            fontSize: '18px',
-            fontWeight: 600,
-            color: 'var(--fd-foreground)',
-          }}>
-            {atlas.name}
-          </h2>
-          {atlas.description && (
-            <p style={{
-              margin: '4px 0 0 0',
-              fontSize: '14px',
-              color: 'var(--fd-muted-foreground)',
-            }}>
-              {atlas.description}
-            </p>
-          )}
-        </div>
-
-        {/* View mode toggle */}
         <div style={{
           display: 'flex',
-          gap: '4px',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '16px',
         }}>
-          {viewModeButtons.map(({ mode, label }) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              style={{
-                padding: '6px 12px',
-                fontSize: '13px',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                backgroundColor: viewMode === mode ? 'var(--fd-primary)' : 'transparent',
-                color: viewMode === mode ? 'var(--fd-primary-foreground)' : 'var(--fd-muted-foreground)',
-                fontWeight: viewMode === mode ? 500 : 400,
-                transition: 'background-color 0.15s, color 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                if (viewMode !== mode) {
-                  e.currentTarget.style.backgroundColor = 'var(--fd-secondary)'
-                  e.currentTarget.style.color = 'var(--fd-foreground)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (viewMode !== mode) {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = 'var(--fd-muted-foreground)'
-                }
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Atlas icon */}
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, oklch(0.55 0.18 280) 0%, oklch(0.45 0.20 320) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '18px',
+              boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.25)',
+            }}>
+              ◈
+            </div>
+
+            <div>
+              <h2 style={{
+                margin: 0,
+                fontSize: '20px',
+                fontWeight: 600,
+                color: 'var(--fd-foreground)',
+                letterSpacing: '-0.02em',
+              }}>
+                {atlas.name}
+              </h2>
+              {atlas.description && (
+                <p style={{
+                  margin: '4px 0 0 0',
+                  fontSize: '14px',
+                  color: 'var(--fd-muted-foreground)',
+                }}>
+                  {atlas.description}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* View mode toggle */}
+          <div style={{
+            display: 'flex',
+            backgroundColor: 'var(--fd-muted)',
+            borderRadius: '8px',
+            padding: '4px',
+          }}>
+            {viewModeButtons.map(({ mode, label, icon }) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  fontSize: '13px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: viewMode === mode ? 'var(--fd-card)' : 'transparent',
+                  color: viewMode === mode ? 'var(--fd-foreground)' : 'var(--fd-muted-foreground)',
+                  fontWeight: viewMode === mode ? 600 : 400,
+                  boxShadow: viewMode === mode ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -523,22 +730,24 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
       {/* Relationships section */}
       {atlas.relationships && atlas.relationships.length > 0 && (
         <div style={{
-          padding: '16px',
+          padding: '20px 24px',
           borderTop: '1px solid var(--fd-border)',
-          backgroundColor: 'var(--fd-muted)',
+          backgroundColor: 'var(--fd-card)',
         }}>
           <h3 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: 'var(--fd-foreground)',
+            margin: '0 0 16px 0',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'var(--fd-muted-foreground)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
           }}>
             Relationships
           </h3>
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '8px',
+            gap: '10px',
           }}>
             {atlas.relationships.map((rel, i) => (
               <div
@@ -546,26 +755,36 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  backgroundColor: 'var(--fd-background)',
-                  borderRadius: '4px',
+                  gap: '10px',
+                  padding: '10px 14px',
+                  backgroundColor: 'var(--fd-muted)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--fd-border)',
                   fontSize: '13px',
                 }}
               >
-                <span style={{ color: 'var(--fd-foreground)' }}>
+                <span style={{
+                  color: 'var(--fd-foreground)',
+                  fontWeight: 500,
+                }}>
                   {atlas.hierarchy.areas[rel.from]?.title || rel.from}
                 </span>
                 <span style={{
-                  padding: '2px 6px',
-                  backgroundColor: 'var(--fd-secondary)',
-                  borderRadius: '3px',
-                  color: 'var(--fd-secondary-foreground)',
-                  fontSize: '11px',
+                  padding: '3px 8px',
+                  backgroundColor: 'oklch(0.92 0.08 280)',
+                  color: 'oklch(0.45 0.15 280)',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
                 }}>
                   {rel.type}
                 </span>
-                <span style={{ color: 'var(--fd-foreground)' }}>
+                <span style={{
+                  color: 'var(--fd-foreground)',
+                  fontWeight: 500,
+                }}>
                   {atlas.hierarchy.areas[rel.to]?.title || rel.to}
                 </span>
               </div>
@@ -577,21 +796,25 @@ export function AtlasPreview({ unit }: AtlasPreviewProps) {
       {/* Tags */}
       {unit.config?.tags && unit.config.tags.length > 0 && (
         <div style={{
-          padding: '12px 16px',
+          padding: '16px 24px',
           borderTop: '1px solid var(--fd-border)',
           display: 'flex',
           gap: '8px',
           flexWrap: 'wrap',
+          backgroundColor: 'var(--fd-card)',
         }}>
           {unit.config.tags.map(tag => (
             <span
               key={tag}
               style={{
-                padding: '2px 8px',
+                padding: '4px 12px',
                 fontSize: '12px',
-                backgroundColor: 'var(--fd-secondary)',
-                color: 'var(--fd-secondary-foreground)',
-                borderRadius: '4px',
+                fontWeight: 500,
+                backgroundColor: 'var(--fd-muted)',
+                color: 'var(--fd-muted-foreground)',
+                borderRadius: '100px',
+                border: '1px solid var(--fd-border)',
+                transition: 'all 0.15s ease',
               }}
             >
               {tag}

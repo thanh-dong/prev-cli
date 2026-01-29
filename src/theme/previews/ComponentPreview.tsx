@@ -1,173 +1,397 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import type { PreviewUnit } from '../../vite/preview-types'
+
+interface PreviewMessage {
+  type: 'ready' | 'init' | 'update' | 'built' | 'error'
+  config?: unknown
+  result?: unknown
+  error?: string
+}
 
 interface ComponentPreviewProps {
   unit: PreviewUnit
 }
 
+// Detect if running in static build (no dev server)
+const isStaticBuild = typeof window !== 'undefined' &&
+  !window.location.hostname.includes('localhost') &&
+  !window.location.hostname.includes('127.0.0.1')
+
 export function ComponentPreview({ unit }: ComponentPreviewProps) {
-  const [props, setProps] = useState<Record<string, unknown>>({})
+  const [props, _setProps] = useState<Record<string, unknown>>({})
   const [schema, setSchema] = useState<unknown>(null)
+  const [buildStatus, setBuildStatus] = useState<'loading' | 'building' | 'ready' | 'error'>('loading')
+  const [buildError, setBuildError] = useState<string | null>(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Load schema if available
   useEffect(() => {
     if (unit.files.schema) {
-      import(`/_preview/components/${unit.name}/${unit.files.schema}`)
+      import(/* @vite-ignore */ `/_preview/components/${unit.name}/${unit.files.schema}`)
         .then(mod => setSchema(mod.schema))
         .catch(() => {})
     }
   }, [unit])
 
-  const iframeUrl = `/_preview-runtime?preview=components/${unit.name}`
+  // Build iframe URL - use static path for production, runtime for dev
+  const baseUrl = typeof window !== 'undefined'
+    ? (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+    : ''
+  const iframeUrl = isStaticBuild
+    ? `${baseUrl}/_preview/components/${unit.name}/`
+    : `/_preview-runtime?preview=components/${unit.name}`
 
-  // Status badge colors
+  // Initialize preview runtime - fetch config and send to iframe (dev mode only)
+  useEffect(() => {
+    if (isStaticBuild) {
+      // In static build, just wait for iframe to load
+      const iframe = iframeRef.current
+      if (iframe) {
+        iframe.onload = () => setBuildStatus('ready')
+      }
+      return
+    }
+
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    let configSent = false
+
+    const handleMessage = (event: MessageEvent) => {
+      const msg = event.data as PreviewMessage
+
+      if (msg.type === 'ready' && !configSent) {
+        configSent = true
+        setBuildStatus('building')
+
+        fetch(`/_preview-config/components/${unit.name}`)
+          .then(res => res.json())
+          .then((config) => {
+            iframe.contentWindow?.postMessage({ type: 'init', config } as PreviewMessage, '*')
+          })
+          .catch(err => {
+            setBuildStatus('error')
+            setBuildError(`Failed to load preview config: ${err.message}`)
+          })
+      }
+
+      if (msg.type === 'built') {
+        const result = msg.result as { success: boolean; error?: string }
+        if (result.success) {
+          setBuildStatus('ready')
+          setBuildError(null)
+        } else {
+          setBuildStatus('error')
+          setBuildError(result.error || 'Build failed')
+        }
+      }
+
+      if (msg.type === 'error') {
+        setBuildStatus('error')
+        setBuildError(msg.error || 'Unknown error')
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [unit.name])
+
+  // Status badge styles
   const getStatusStyle = (status: string): React.CSSProperties => {
     switch (status) {
       case 'stable':
-        return { backgroundColor: 'oklch(0.85 0.15 145)', color: 'oklch(0.30 0.10 145)' }
+        return {
+          backgroundColor: 'oklch(0.92 0.08 155)',
+          color: 'oklch(0.35 0.12 155)',
+          borderColor: 'oklch(0.85 0.10 155)',
+        }
       case 'deprecated':
-        return { backgroundColor: 'oklch(0.85 0.15 25)', color: 'oklch(0.35 0.15 25)' }
+        return {
+          backgroundColor: 'oklch(0.92 0.08 25)',
+          color: 'oklch(0.45 0.15 25)',
+          borderColor: 'oklch(0.85 0.12 25)',
+        }
       default: // draft
-        return { backgroundColor: 'oklch(0.85 0.15 85)', color: 'oklch(0.35 0.10 85)' }
+        return {
+          backgroundColor: 'oklch(0.94 0.06 85)',
+          color: 'oklch(0.45 0.12 85)',
+          borderColor: 'oklch(0.88 0.08 85)',
+        }
     }
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      border: '1px solid var(--fd-border)',
-      borderRadius: '8px',
-      overflow: 'hidden',
-      backgroundColor: 'var(--fd-background)',
-    }}>
-      {/* Header */}
-      <div style={{
+    <div
+      style={{
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 16px',
-        backgroundColor: 'var(--fd-muted)',
+        flexDirection: 'column',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        backgroundColor: 'var(--fd-card)',
+        boxShadow: isHovered
+          ? '0 20px 40px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+          : '0 4px 20px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+        transition: 'box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: isHovered ? 'translateY(-2px)' : 'none',
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Header - Editorial style */}
+      <div style={{
+        padding: '20px 24px',
         borderBottom: '1px solid var(--fd-border)',
+        background: 'linear-gradient(to bottom, var(--fd-card), var(--fd-muted))',
       }}>
-        <div>
-          <h2 style={{
-            margin: 0,
-            fontSize: '18px',
-            fontWeight: 600,
-            color: 'var(--fd-foreground)',
-          }}>
-            {unit.config?.title || unit.name}
-          </h2>
-          {unit.config?.description && (
-            <p style={{
-              margin: '4px 0 0 0',
-              fontSize: '14px',
-              color: 'var(--fd-muted-foreground)',
-            }}>
-              {unit.config.description}
-            </p>
-          )}
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+              {/* Component icon */}
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, var(--fd-primary) 0%, oklch(0.45 0.12 280) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--fd-primary-foreground)',
+                fontSize: '14px',
+                fontWeight: 600,
+                boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.2)',
+              }}>
+                ◇
+              </div>
+              <h2 style={{
+                margin: 0,
+                fontSize: '20px',
+                fontWeight: 600,
+                color: 'var(--fd-foreground)',
+                letterSpacing: '-0.02em',
+              }}>
+                {unit.config?.title || unit.name}
+              </h2>
+            </div>
+            {unit.config?.description && (
+              <p style={{
+                margin: 0,
+                fontSize: '14px',
+                color: 'var(--fd-muted-foreground)',
+                lineHeight: 1.5,
+                paddingLeft: '44px',
+              }}>
+                {unit.config.description}
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Build status indicator */}
+            {buildStatus === 'building' && (
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: 'oklch(0.75 0.15 85)',
+                animation: 'pulse 1.5s ease-in-out infinite',
+              }} />
+            )}
+            {buildStatus === 'ready' && (
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: 'oklch(0.65 0.18 155)',
+              }} />
+            )}
+
+            {unit.config?.status && (
+              <span style={{
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                ...getStatusStyle(unit.config.status),
+              }}>
+                {unit.config.status}
+              </span>
+            )}
+          </div>
         </div>
-        {unit.config?.status && (
-          <span style={{
-            padding: '4px 8px',
-            fontSize: '12px',
-            fontWeight: 500,
-            borderRadius: '4px',
-            ...getStatusStyle(unit.config.status),
-          }}>
-            {unit.config.status}
-          </span>
-        )}
       </div>
 
-      {/* Preview area */}
+      {/* Canvas area - Component showcase */}
       <div style={{
-        padding: '24px',
+        position: 'relative',
+        padding: '40px',
+        minHeight: '280px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '200px',
-        backgroundColor: 'var(--fd-background)',
-        backgroundImage: 'linear-gradient(45deg, var(--fd-border) 25%, transparent 25%), linear-gradient(-45deg, var(--fd-border) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--fd-border) 75%), linear-gradient(-45deg, transparent 75%, var(--fd-border) 75%)',
-        backgroundSize: '16px 16px',
-        backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+        // Elegant dot grid pattern
+        backgroundColor: 'var(--fd-muted)',
+        backgroundImage: `
+          radial-gradient(circle at center, var(--fd-border) 1px, transparent 1px)
+        `,
+        backgroundSize: '24px 24px',
+        backgroundPosition: '12px 12px',
       }}>
+        {/* Canvas container with subtle inner shadow */}
         <div style={{
+          position: 'relative',
           width: '100%',
-          height: '100%',
-          minHeight: '200px',
+          maxWidth: '600px',
           backgroundColor: 'var(--fd-background)',
+          borderRadius: '12px',
+          boxShadow: `
+            0 0 0 1px var(--fd-border),
+            0 4px 16px -4px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 0 rgba(255, 255, 255, 0.1)
+          `,
+          overflow: 'hidden',
         }}>
+          {/* Error overlay */}
+          {buildStatus === 'error' && buildError && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(254, 242, 242, 0.95)',
+              backdropFilter: 'blur(4px)',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10,
+            }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#fecaca',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px',
+                fontSize: '24px',
+              }}>
+                ✕
+              </div>
+              <p style={{
+                margin: 0,
+                fontSize: '13px',
+                color: '#dc2626',
+                fontFamily: 'var(--fd-font-mono)',
+                textAlign: 'center',
+                maxWidth: '400px',
+                lineHeight: 1.5,
+              }}>
+                {buildError}
+              </p>
+            </div>
+          )}
+
+          {/* Loading state */}
+          {buildStatus === 'loading' && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'var(--fd-background)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 5,
+            }}>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                border: '2px solid var(--fd-border)',
+                borderTopColor: 'var(--fd-primary)',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite',
+              }} />
+            </div>
+          )}
+
           <iframe
+            ref={iframeRef}
             src={iframeUrl}
             style={{
               border: 'none',
               width: '100%',
-              height: '100%',
-              minHeight: '200px',
+              height: '220px',
+              display: 'block',
+              opacity: buildStatus === 'ready' ? 1 : 0.3,
+              transition: 'opacity 0.3s ease',
             }}
             title={`Preview: ${unit.name}`}
           />
         </div>
       </div>
 
-      {/* Props panel */}
+      {/* Props panel - Refined */}
       {schema && (
         <div style={{
-          padding: '16px',
+          padding: '20px 24px',
           borderTop: '1px solid var(--fd-border)',
-          backgroundColor: 'var(--fd-muted)',
+          backgroundColor: 'var(--fd-card)',
         }}>
           <h3 style={{
-            margin: '0 0 8px 0',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: 'var(--fd-foreground)',
+            margin: '0 0 12px 0',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'var(--fd-muted-foreground)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
           }}>
-            Props
+            Properties
           </h3>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '16px',
-            fontSize: '14px',
+          <pre style={{
+            margin: 0,
+            padding: '16px',
+            fontSize: '12px',
+            backgroundColor: 'var(--fd-muted)',
+            borderRadius: '8px',
+            fontFamily: 'var(--fd-font-mono)',
+            overflow: 'auto',
+            border: '1px solid var(--fd-border)',
           }}>
-            {/* TODO: Generate controls from schema */}
-            <pre style={{
-              margin: 0,
-              padding: '8px',
-              fontSize: '12px',
-              backgroundColor: 'var(--fd-card)',
-              borderRadius: '4px',
-              fontFamily: 'var(--fd-font-mono)',
-              overflow: 'auto',
-            }}>
-              {JSON.stringify(props, null, 2)}
-            </pre>
-          </div>
+            {JSON.stringify(props, null, 2)}
+          </pre>
         </div>
       )}
 
-      {/* Tags */}
+      {/* Tags - Pill style */}
       {unit.config?.tags && unit.config.tags.length > 0 && (
         <div style={{
-          padding: '12px 16px',
+          padding: '16px 24px',
           borderTop: '1px solid var(--fd-border)',
           display: 'flex',
           gap: '8px',
           flexWrap: 'wrap',
+          backgroundColor: 'var(--fd-card)',
         }}>
           {unit.config.tags.map(tag => (
             <span
               key={tag}
               style={{
-                padding: '2px 8px',
+                padding: '4px 12px',
                 fontSize: '12px',
-                backgroundColor: 'var(--fd-secondary)',
-                color: 'var(--fd-secondary-foreground)',
-                borderRadius: '4px',
+                fontWeight: 500,
+                backgroundColor: 'var(--fd-muted)',
+                color: 'var(--fd-muted-foreground)',
+                borderRadius: '100px',
+                border: '1px solid var(--fd-border)',
+                transition: 'all 0.15s ease',
               }}
             >
               {tag}
@@ -175,6 +399,14 @@ export function ComponentPreview({ unit }: ComponentPreviewProps) {
           ))}
         </div>
       )}
+
+      {/* Inline styles for animations */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   )
 }

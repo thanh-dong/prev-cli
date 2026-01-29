@@ -58,31 +58,60 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
   if (loading) {
     return (
       <div style={{
-        padding: '32px',
-        textAlign: 'center',
-        color: 'var(--fd-muted-foreground)',
+        padding: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'var(--fd-card)',
+        borderRadius: '16px',
       }}>
-        Loading flow...
+        <div style={{
+          width: '32px',
+          height: '32px',
+          border: '2px solid var(--fd-border)',
+          borderTopColor: 'var(--fd-primary)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
       </div>
     )
   }
 
-  // Fix 3: Zero-step flow handling
   if (!flow || !flow.steps || flow.steps.length === 0) {
     return (
       <div style={{
-        padding: '32px',
+        padding: '48px',
         textAlign: 'center',
-        color: 'oklch(0.65 0.15 85)', // yellow-ish warning color
+        backgroundColor: 'var(--fd-card)',
+        borderRadius: '16px',
+        border: '1px solid var(--fd-border)',
       }}>
+        <div style={{
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: 'oklch(0.94 0.06 85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 16px',
+          fontSize: '24px',
+        }}>
+          ⚠
+        </div>
         <h2 style={{
           margin: '0 0 8px 0',
           fontSize: '18px',
           fontWeight: 600,
+          color: 'var(--fd-foreground)',
         }}>
           {flow?.name || 'Flow'}
         </h2>
-        <p style={{ margin: 0 }}>
+        <p style={{
+          margin: 0,
+          fontSize: '14px',
+          color: 'var(--fd-muted-foreground)',
+        }}>
           {flow ? 'This flow has no steps defined.' : 'Failed to load flow definition.'}
         </p>
       </div>
@@ -93,8 +122,9 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
   const totalSteps = flow.steps.length
 
   // Build iframe URL for current step's screen
-  // Use static preview path for production, dev server for development
-  const basePath = typeof window !== 'undefined' ? window.location.pathname.split('/previews')[0] : ''
+  const basePath = typeof window !== 'undefined'
+    ? (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+    : ''
   const iframeUrl = step
     ? (isStaticBuild
         ? `${basePath}/_preview/screens/${step.screen}/`
@@ -105,203 +135,328 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      border: '1px solid var(--fd-border)',
-      borderRadius: '8px',
+      borderRadius: '16px',
       overflow: 'hidden',
-      backgroundColor: 'var(--fd-background)',
+      backgroundColor: 'var(--fd-card)',
+      boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04)',
     }}>
       {/* Header */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 16px',
-        backgroundColor: 'var(--fd-muted)',
+        padding: '20px 24px',
+        background: 'linear-gradient(to bottom, var(--fd-card), var(--fd-muted))',
         borderBottom: '1px solid var(--fd-border)',
       }}>
-        <div>
-          <h2 style={{
-            margin: 0,
-            fontSize: '18px',
-            fontWeight: 600,
-            color: 'var(--fd-foreground)',
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '16px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Flow icon */}
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, oklch(0.60 0.18 170) 0%, oklch(0.50 0.20 200) 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '18px',
+              boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.25)',
+            }}>
+              ⇢
+            </div>
+
+            <div>
+              <h2 style={{
+                margin: 0,
+                fontSize: '20px',
+                fontWeight: 600,
+                color: 'var(--fd-foreground)',
+                letterSpacing: '-0.02em',
+              }}>
+                {flow.name}
+              </h2>
+              {flow.description && (
+                <p style={{
+                  margin: '4px 0 0 0',
+                  fontSize: '14px',
+                  color: 'var(--fd-muted-foreground)',
+                }}>
+                  {flow.description}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Step counter */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 14px',
+            backgroundColor: 'var(--fd-muted)',
+            borderRadius: '8px',
           }}>
-            {flow.name}
-          </h2>
-          {flow.description && (
-            <p style={{
-              margin: '4px 0 0 0',
+            <span style={{
+              fontSize: '20px',
+              fontWeight: 700,
+              color: 'var(--fd-foreground)',
+            }}>
+              {currentStep + 1}
+            </span>
+            <span style={{
               fontSize: '14px',
               color: 'var(--fd-muted-foreground)',
             }}>
-              {flow.description}
-            </p>
-          )}
+              / {totalSteps}
+            </span>
+          </div>
         </div>
-        <span style={{
-          fontSize: '14px',
-          color: 'var(--fd-muted-foreground)',
-        }}>
-          Step {currentStep + 1} of {totalSteps}
-        </span>
       </div>
 
-      {/* Preview area */}
+      {/* Progress timeline */}
       <div style={{
-        padding: '24px',
+        padding: '16px 24px',
         backgroundColor: 'var(--fd-muted)',
-        display: 'flex',
-        justifyContent: 'center',
-        overflow: 'auto',
+        borderBottom: '1px solid var(--fd-border)',
       }}>
         <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+        }}>
+          {flow.steps.map((s, i) => (
+            <React.Fragment key={i}>
+              <button
+                onClick={() => setCurrentStep(i)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  backgroundColor: i === currentStep
+                    ? 'var(--fd-primary)'
+                    : i < currentStep
+                    ? 'oklch(0.65 0.18 155)'
+                    : 'var(--fd-background)',
+                  color: i <= currentStep
+                    ? 'white'
+                    : 'var(--fd-muted-foreground)',
+                  boxShadow: i === currentStep
+                    ? '0 2px 8px -2px rgba(0, 0, 0, 0.3)'
+                    : '0 1px 2px rgba(0, 0, 0, 0.05)',
+                  transition: 'all 0.2s ease',
+                  transform: i === currentStep ? 'scale(1.1)' : 'scale(1)',
+                }}
+                title={s.title || `Step ${i + 1}`}
+              >
+                {i < currentStep ? '✓' : i + 1}
+              </button>
+              {i < flow.steps.length - 1 && (
+                <div style={{
+                  flex: 1,
+                  height: '2px',
+                  backgroundColor: i < currentStep
+                    ? 'oklch(0.65 0.18 155)'
+                    : 'var(--fd-border)',
+                  transition: 'background-color 0.3s ease',
+                }} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Current step info */}
+        {step && (step.title || step.description) && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 16px',
+            backgroundColor: 'var(--fd-background)',
+            borderRadius: '8px',
+            border: '1px solid var(--fd-border)',
+          }}>
+            {step.title && (
+              <h3 style={{
+                margin: 0,
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--fd-foreground)',
+              }}>
+                {step.title}
+              </h3>
+            )}
+            {step.description && (
+              <p style={{
+                margin: step.title ? '4px 0 0 0' : 0,
+                fontSize: '13px',
+                color: 'var(--fd-muted-foreground)',
+              }}>
+                {step.description}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Preview canvas */}
+      <div style={{
+        padding: '32px',
+        backgroundColor: 'oklch(0.15 0.01 260)',
+        // Subtle grid pattern
+        backgroundImage: `
+          linear-gradient(oklch(0.20 0.01 260) 1px, transparent 1px),
+          linear-gradient(90deg, oklch(0.20 0.01 260) 1px, transparent 1px)
+        `,
+        backgroundSize: '20px 20px',
+        display: 'flex',
+        justifyContent: 'center',
+        minHeight: '450px',
+      }}>
+        {/* Screen frame */}
+        <div style={{
           width: '100%',
-          maxWidth: '896px',
-          backgroundColor: 'var(--fd-background)',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-          borderRadius: '4px',
+          maxWidth: '800px',
+          backgroundColor: 'var(--fd-card)',
+          borderRadius: '12px',
+          boxShadow: `
+            0 0 0 1px rgba(255, 255, 255, 0.1),
+            0 8px 40px -8px rgba(0, 0, 0, 0.4),
+            0 25px 80px -15px rgba(0, 0, 0, 0.3)
+          `,
           overflow: 'hidden',
         }}>
+          {/* Mini browser chrome */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 12px',
+            backgroundColor: 'var(--fd-muted)',
+            borderBottom: '1px solid var(--fd-border)',
+          }}>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'oklch(0.70 0.18 25)' }} />
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'oklch(0.80 0.15 85)' }} />
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'oklch(0.70 0.18 145)' }} />
+            </div>
+            <div style={{
+              flex: 1,
+              marginLeft: '8px',
+              padding: '4px 10px',
+              backgroundColor: 'var(--fd-background)',
+              borderRadius: '4px',
+              fontSize: '10px',
+              fontFamily: 'var(--fd-font-mono)',
+              color: 'var(--fd-muted-foreground)',
+            }}>
+              {step.screen}
+            </div>
+          </div>
+
           <iframe
             src={iframeUrl}
             style={{
               width: '100%',
-              height: '500px',
+              height: '400px',
               border: 'none',
               display: 'block',
+              backgroundColor: 'white',
             }}
             title={`Flow: ${flow.name} - Step ${currentStep + 1}`}
           />
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation controls */}
       <div style={{
-        padding: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '16px 24px',
         borderTop: '1px solid var(--fd-border)',
-        backgroundColor: 'var(--fd-muted)',
+        backgroundColor: 'var(--fd-card)',
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          maxWidth: '896px',
-          margin: '0 auto',
-        }}>
-          {/* Previous button */}
-          <button
-            onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
-            disabled={currentStep === 0}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
-              backgroundColor: 'transparent',
-              color: currentStep === 0 ? 'var(--fd-muted-foreground)' : 'var(--fd-foreground)',
-              opacity: currentStep === 0 ? 0.5 : 1,
-              transition: 'background-color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (currentStep !== 0) {
-                e.currentTarget.style.backgroundColor = 'var(--fd-secondary)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            Previous
-          </button>
-
-          {/* Step dots */}
-          <div style={{
+        <button
+          onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
+          disabled={currentStep === 0}
+          style={{
             display: 'flex',
+            alignItems: 'center',
             gap: '8px',
-          }}>
-            {flow.steps.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentStep(i)}
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  padding: 0,
-                  border: 'none',
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  backgroundColor: i === currentStep
-                    ? 'var(--fd-foreground)'
-                    : 'var(--fd-border)',
-                  transition: 'background-color 0.15s',
-                }}
-                title={`Step ${i + 1}`}
-              />
-            ))}
-          </div>
+            padding: '10px 20px',
+            fontSize: '14px',
+            fontWeight: 500,
+            border: '1px solid var(--fd-border)',
+            borderRadius: '8px',
+            cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+            backgroundColor: 'var(--fd-background)',
+            color: currentStep === 0 ? 'var(--fd-muted-foreground)' : 'var(--fd-foreground)',
+            opacity: currentStep === 0 ? 0.5 : 1,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          ← Previous
+        </button>
 
-          {/* Next button */}
-          <button
-            onClick={() => setCurrentStep(s => Math.min(totalSteps - 1, s + 1))}
-            disabled={currentStep === totalSteps - 1}
-            style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: currentStep === totalSteps - 1 ? 'not-allowed' : 'pointer',
-              backgroundColor: 'transparent',
-              color: currentStep === totalSteps - 1 ? 'var(--fd-muted-foreground)' : 'var(--fd-foreground)',
-              opacity: currentStep === totalSteps - 1 ? 0.5 : 1,
-              transition: 'background-color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (currentStep !== totalSteps - 1) {
-                e.currentTarget.style.backgroundColor = 'var(--fd-secondary)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            Next
-          </button>
-        </div>
-
-        {/* Step info */}
+        {/* Step notes */}
         {step && (step.note || step.trigger) && (
           <div style={{
-            marginTop: '16px',
-            padding: '12px',
-            backgroundColor: 'var(--fd-background)',
-            borderRadius: '4px',
-            maxWidth: '896px',
-            marginLeft: 'auto',
-            marginRight: 'auto',
+            flex: 1,
+            maxWidth: '400px',
+            margin: '0 24px',
+            padding: '8px 16px',
+            backgroundColor: 'var(--fd-muted)',
+            borderRadius: '8px',
+            fontSize: '12px',
+            textAlign: 'center',
           }}>
-            {step.note && (
-              <p style={{
-                margin: 0,
-                fontSize: '14px',
-                color: 'var(--fd-foreground)',
-              }}>
-                <span style={{ marginRight: '8px' }}>Note:</span>
-                {step.note}
-              </p>
-            )}
             {step.trigger && (
-              <p style={{
-                margin: step.note ? '8px 0 0 0' : 0,
-                fontSize: '14px',
-                color: 'var(--fd-muted-foreground)',
+              <span style={{
+                color: 'oklch(0.55 0.15 250)',
+                fontWeight: 500,
               }}>
-                <span style={{ marginRight: '8px' }}>Trigger:</span>
                 {step.trigger}
-              </p>
+              </span>
+            )}
+            {step.trigger && step.note && ' → '}
+            {step.note && (
+              <span style={{ color: 'var(--fd-muted-foreground)' }}>
+                {step.note}
+              </span>
             )}
           </div>
         )}
+
+        <button
+          onClick={() => setCurrentStep(s => Math.min(totalSteps - 1, s + 1))}
+          disabled={currentStep === totalSteps - 1}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 20px',
+            fontSize: '14px',
+            fontWeight: 500,
+            border: 'none',
+            borderRadius: '8px',
+            cursor: currentStep === totalSteps - 1 ? 'not-allowed' : 'pointer',
+            backgroundColor: currentStep === totalSteps - 1 ? 'var(--fd-muted)' : 'var(--fd-primary)',
+            color: currentStep === totalSteps - 1 ? 'var(--fd-muted-foreground)' : 'var(--fd-primary-foreground)',
+            opacity: currentStep === totalSteps - 1 ? 0.5 : 1,
+            transition: 'all 0.15s ease',
+          }}
+        >
+          Next →
+        </button>
       </div>
     </div>
   )
