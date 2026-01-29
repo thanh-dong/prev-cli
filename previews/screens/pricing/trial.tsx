@@ -55,14 +55,14 @@ export default function PricingTrial() {
               style={{
                 backgroundColor: 'white',
                 borderRadius: 16,
-                border: plan.popular ? `2px solid ${colors.primary}` : `1px solid ${colors.gray200}`,
+                border: ('popular' in plan && plan.popular) ? `2px solid ${colors.primary}` : `1px solid ${colors.gray200}`,
                 padding: 32,
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
               }}
             >
-              {plan.popular && (
+              {'popular' in plan && plan.popular && (
                 <div style={{
                   position: 'absolute',
                   top: -12,
@@ -105,7 +105,7 @@ export default function PricingTrial() {
                 ))}
               </ul>
 
-              <Button variant={plan.popular ? 'primary' : 'secondary'}>
+              <Button variant={('popular' in plan && plan.popular) ? 'primary' : 'secondary'}>
                 {plan.name === 'Free' ? 'Downgrade' : plan.cta}
               </Button>
             </div>
