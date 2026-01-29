@@ -1,0 +1,10 @@
+# previews/screens/upgrade-success/config.yaml
+kind: screen
+id: upgrade-success
+title: Upgrade Success
+description: Plan upgrade confirmation
+status: stable
+schemaVersion: "2.0"
+tags: [screen, billing, success]
+states:
+  default: { description: "Upgrade complete" }
