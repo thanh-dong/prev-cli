@@ -1,0 +1,13 @@
+# previews/screens/team/config.yaml
+kind: screen
+id: team
+title: Team
+description: Team member management
+status: stable
+schemaVersion: "2.0"
+tags: [screen, team, members]
+states:
+  default: { description: "Team member list" }
+  empty: { description: "No team members" }
+  inviting: { description: "Invite modal open" }
+  pending: { description: "Showing pending invites" }
