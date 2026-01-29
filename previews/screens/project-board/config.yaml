@@ -1,0 +1,11 @@
+kind: screen
+id: project-board
+title: Project Board
+description: Kanban board with task columns
+status: stable
+schemaVersion: "2.0"
+tags: [screen, board, kanban, tasks]
+states:
+  default: { description: "Board with tasks in columns" }
+  empty: { description: "No tasks yet" }
+  filtered: { description: "Filter applied to tasks" }
