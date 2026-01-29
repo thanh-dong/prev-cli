@@ -1,0 +1,10 @@
+kind: screen
+id: signup
+title: Signup
+description: Account creation with Workflow branding
+status: stable
+schemaVersion: "2.0"
+tags: [screen, auth, form]
+states:
+  default: { description: "Signup form ready for input" }
+  success: { description: "Account created successfully" }
