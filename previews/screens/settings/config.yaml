@@ -1,0 +1,11 @@
+# previews/screens/settings/config.yaml
+kind: screen
+id: settings
+title: Settings
+description: User and workspace settings
+status: stable
+schemaVersion: "2.0"
+tags: [screen, settings, profile]
+states:
+  default: { description: "Settings form" }
+  saving: { description: "Save confirmation" }
