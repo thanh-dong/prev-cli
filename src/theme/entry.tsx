@@ -500,70 +500,25 @@ function PreviewPage() {
     <div className="preview-detail-page">
       {/* State selector for screens with multiple states */}
       {hasStates && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '12px 16px',
-          backgroundColor: 'var(--fd-card)',
-          borderBottom: '1px solid var(--fd-border)',
-        }}>
-          <span style={{
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--fd-muted-foreground)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}>
-            State:
-          </span>
-          <div style={{
-            display: 'inline-flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: 'var(--fd-muted)',
-            borderRadius: '8px',
-            padding: '4px',
-          }}>
+        <div className="preview-state-selector">
+          <span className="preview-state-label">State:</span>
+          <div className="preview-state-buttons">
             <button
+              type="button"
+              className={`preview-state-btn ${selectedState === null ? 'active' : ''}`}
               onClick={() => setSelectedState(null)}
-              style={{
-                padding: '6px 12px',
-                fontSize: '13px',
-                fontWeight: selectedState === null ? 600 : 400,
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                backgroundColor: selectedState === null ? 'var(--fd-background)' : 'transparent',
-                color: selectedState === null ? 'var(--fd-foreground)' : 'var(--fd-muted-foreground)',
-                boxShadow: selectedState === null ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease',
-                marginRight: '4px',
-              }}
             >
               Default
             </button>
-            {states.map((stateFile: string, index: number) => {
+            {states.map((stateFile: string) => {
               const stateName = stateFile.replace(/\.(tsx|jsx)$/, '')
               const isSelected = selectedState === stateName
               return (
                 <button
                   key={stateFile}
+                  type="button"
+                  className={`preview-state-btn ${isSelected ? 'active' : ''}`}
                   onClick={() => setSelectedState(stateName)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '13px',
-                    fontWeight: isSelected ? 600 : 400,
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    backgroundColor: isSelected ? 'var(--fd-background)' : 'transparent',
-                    color: isSelected ? 'var(--fd-foreground)' : 'var(--fd-muted-foreground)',
-                    boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.15s ease',
-                    textTransform: 'capitalize',
-                    marginRight: index < states.length - 1 ? '4px' : 0,
-                  }}
                 >
                   {stateName.replace(/[-_]/g, ' ')}
                 </button>
