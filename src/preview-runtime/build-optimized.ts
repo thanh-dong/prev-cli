@@ -135,9 +135,12 @@ export async function buildOptimizedPreview(
 
     // Canvas styling for showcase presentation
     const canvasStyles = `
-      body {
+      html, body {
         margin: 0;
         min-height: 100vh;
+        overflow: hidden;
+      }
+      body {
         display: flex;
         align-items: center;
         justify-content: center;
