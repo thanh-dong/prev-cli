@@ -1,0 +1,7 @@
+kind: component
+id: sidebar
+title: Sidebar
+description: App navigation sidebar with user info
+status: stable
+schemaVersion: "2.0"
+tags: [component, navigation, layout]
