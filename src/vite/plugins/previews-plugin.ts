@@ -94,11 +94,20 @@ export function getByStatus(status) {
         rmSync(targetDir, { recursive: true })
       }
 
-      // Scan previews
-      const previews = await scanPreviews(rootDir)
-      if (previews.length === 0) return
+      // Scan preview units (includes state information)
+      const units = await scanPreviewUnits(rootDir)
+      if (units.length === 0) return
 
-      console.log(`\n  Building ${previews.length} preview(s)...`)
+      // Count total builds (including states)
+      let totalBuilds = 0
+      for (const unit of units) {
+        totalBuilds++ // default state
+        if (unit.files.states) {
+          totalBuilds += unit.files.states.length
+        }
+      }
+
+      console.log(`\n  Building ${totalBuilds} preview(s)...`)
 
       // Step 1: Build shared vendor bundle
       console.log('    Building shared vendor bundle...')
@@ -121,33 +130,54 @@ export function getByStatus(status) {
       writeFileSync(path.join(vendorsDir, 'jsx.js'), jsxResult.code)
       console.log('    ✓ _vendors/jsx.js')
 
-      // Step 2: Build each preview with optimized builder
-      for (const preview of previews) {
-        const previewDir = path.join(previewsDir, preview.name)
+      // Step 2: Build each preview unit with optimized builder
+      for (const unit of units) {
+        const previewDir = path.join(previewsDir, unit.type + 's', unit.name)
+        const previewPath = `${unit.type}s/${unit.name}`
 
+        // Calculate relative path from preview to vendors
+        const depth = previewPath.split('/').length
+        const vendorPath = '../'.repeat(depth) + '_vendors/runtime.js'
+
+        // Build default state (index)
         try {
           const config = await buildPreviewConfig(previewDir)
-
-          // Calculate relative path from preview to vendors
-          // e.g., components/button -> ../../_vendors/runtime.js
-          const depth = preview.name.split('/').length
-          const vendorPath = '../'.repeat(depth) + '_vendors/runtime.js'
-
           const result = await buildOptimizedPreview(config, { vendorPath })
 
           if (!result.success) {
-            console.error(`    ✗ ${preview.name}: ${result.error}`)
-            continue
+            console.error(`    ✗ ${previewPath}: ${result.error}`)
+          } else {
+            const outputDir = path.join(targetDir, previewPath)
+            mkdirSync(outputDir, { recursive: true })
+            writeFileSync(path.join(outputDir, 'index.html'), result.html)
+            console.log(`    ✓ ${previewPath}`)
           }
-
-          // Write to output directory
-          const outputDir = path.join(targetDir, preview.name)
-          mkdirSync(outputDir, { recursive: true })
-          writeFileSync(path.join(outputDir, 'index.html'), result.html)
-
-          console.log(`    ✓ ${preview.name}`)
         } catch (err) {
-          console.error(`    ✗ ${preview.name}: ${err}`)
+          console.error(`    ✗ ${previewPath}: ${err}`)
+        }
+
+        // Build additional states for screens
+        if (unit.type === 'screen' && unit.files.states) {
+          for (const stateFile of unit.files.states) {
+            const stateName = stateFile.replace(/\.(tsx|jsx)$/, '')
+            const stateVendorPath = '../'.repeat(depth + 1) + '_vendors/runtime.js'
+
+            try {
+              const config = await buildPreviewConfig(previewDir, stateFile)
+              const result = await buildOptimizedPreview(config, { vendorPath: stateVendorPath })
+
+              if (!result.success) {
+                console.error(`    ✗ ${previewPath}/${stateName}: ${result.error}`)
+              } else {
+                const outputDir = path.join(targetDir, previewPath, stateName)
+                mkdirSync(outputDir, { recursive: true })
+                writeFileSync(path.join(outputDir, 'index.html'), result.html)
+                console.log(`    ✓ ${previewPath}/${stateName}`)
+              }
+            } catch (err) {
+              console.error(`    ✗ ${previewPath}/${stateName}: ${err}`)
+            }
+          }
         }
       }
     }

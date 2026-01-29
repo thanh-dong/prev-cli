@@ -27,6 +27,7 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [buildStatus, setBuildStatus] = useState<'loading' | 'building' | 'ready' | 'error'>('loading')
   const [buildError, setBuildError] = useState<string | null>(null)
+  const [iframeLoaded, setIframeLoaded] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const fullscreenIframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -34,20 +35,32 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
   const baseUrl = typeof window !== 'undefined'
     ? (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
     : ''
+  // For static builds: default state is in root, other states are in subdirs
+  const staticStatePath = activeState === 'index' ? '' : `${activeState}/`
   const iframeUrl = isStaticBuild
-    ? `${baseUrl}/_preview/screens/${unit.name}/`
+    ? `${baseUrl}/_preview/screens/${unit.name}/${staticStatePath}`
     : `/_preview-runtime?preview=screens/${unit.name}&state=${activeState}`
+
+  // Skip spinner immediately for static builds (runs after hydration)
+  useEffect(() => {
+    if (isStaticBuild) {
+      setBuildStatus('ready')
+    }
+  }, [])
+
+  // Track iframe load state for opacity hint
+  useEffect(() => {
+    const iframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current
+    if (!iframe) return
+
+    const handleLoad = () => setIframeLoaded(true)
+    iframe.addEventListener('load', handleLoad)
+    return () => iframe.removeEventListener('load', handleLoad)
+  }, [isFullscreen])
 
   // Initialize preview runtime - fetch config and send to iframe (dev mode only)
   useEffect(() => {
-    if (isStaticBuild) {
-      // In static build, just wait for iframe to load
-      const iframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current
-      if (iframe) {
-        iframe.onload = () => setBuildStatus('ready')
-      }
-      return
-    }
+    if (isStaticBuild) return
 
     const iframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current
     if (!iframe) return
@@ -433,7 +446,7 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
                 border: 'none',
                 display: 'block',
                 backgroundColor: 'white',
-                opacity: buildStatus === 'ready' ? 1 : 0.5,
+                opacity: (isStaticBuild ? iframeLoaded : buildStatus === 'ready') ? 1 : 0.5,
                 transition: 'opacity 0.3s ease',
               }}
               title={`Screen: ${unit.name} - ${activeState}`}

@@ -8,10 +8,15 @@
     "skipLibCheck": true,
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "jsx": "react-jsx",
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "paths": {
+      "@prev/jsx": ["./src/jsx/index.ts"],
+      "@prev/components/*": ["./previews/components/*", "./previews/components/*/index.tsx"],
+      "*": ["./*"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "previews/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "src/theme/**/*"]
 }

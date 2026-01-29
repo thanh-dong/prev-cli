@@ -99,10 +99,12 @@ export function detectEntry(files: PreviewFile[]): string {
 
 /**
  * Build a PreviewConfig for WASM runtime
+ * @param previewDir - Directory containing the preview files
+ * @param entryOverride - Optional entry file override (for building alternate states)
  */
-export async function buildPreviewConfig(previewDir: string): Promise<PreviewConfig> {
+export async function buildPreviewConfig(previewDir: string, entryOverride?: string): Promise<PreviewConfig> {
   const files = await scanPreviewFiles(previewDir)
-  const entry = detectEntry(files)
+  const entry = entryOverride || detectEntry(files)
 
   return {
     files,

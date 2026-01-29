@@ -49,6 +49,11 @@ declare module 'virtual:prev-config' {
   export const config: PrevConfig
 }
 
+declare module 'virtual:prev-tokens' {
+  import type { TokensConfig } from '../tokens/resolver'
+  export const tokens: TokensConfig
+}
+
 declare module '*.mdx' {
   import type { ComponentType } from 'react'
   const component: ComponentType

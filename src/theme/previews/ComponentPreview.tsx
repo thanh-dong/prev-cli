@@ -22,6 +22,7 @@ export function ComponentPreview({ unit }: ComponentPreviewProps) {
   const [schema, setSchema] = useState<unknown>(null)
   const [buildStatus, setBuildStatus] = useState<'loading' | 'building' | 'ready' | 'error'>('loading')
   const [buildError, setBuildError] = useState<string | null>(null)
+  const [iframeLoaded, setIframeLoaded] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -42,16 +43,26 @@ export function ComponentPreview({ unit }: ComponentPreviewProps) {
     ? `${baseUrl}/_preview/components/${unit.name}/`
     : `/_preview-runtime?preview=components/${unit.name}`
 
-  // Initialize preview runtime - fetch config and send to iframe (dev mode only)
+  // Skip spinner immediately for static builds (runs after hydration)
   useEffect(() => {
     if (isStaticBuild) {
-      // In static build, just wait for iframe to load
-      const iframe = iframeRef.current
-      if (iframe) {
-        iframe.onload = () => setBuildStatus('ready')
-      }
-      return
+      setBuildStatus('ready')
     }
+  }, [])
+
+  // Track iframe load state for opacity hint
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const handleLoad = () => setIframeLoaded(true)
+    iframe.addEventListener('load', handleLoad)
+    return () => iframe.removeEventListener('load', handleLoad)
+  }, [])
+
+  // Initialize preview runtime - fetch config and send to iframe (dev mode only)
+  useEffect(() => {
+    if (isStaticBuild) return
 
     const iframe = iframeRef.current
     if (!iframe) return
@@ -330,7 +341,7 @@ export function ComponentPreview({ unit }: ComponentPreviewProps) {
               width: '100%',
               height: '220px',
               display: 'block',
-              opacity: buildStatus === 'ready' ? 1 : 0.3,
+              opacity: (isStaticBuild ? iframeLoaded : buildStatus === 'ready') ? 1 : 0.3,
               transition: 'opacity 0.3s ease',
             }}
             title={`Preview: ${unit.name}`}
