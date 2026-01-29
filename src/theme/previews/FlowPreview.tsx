@@ -1,17 +1,51 @@
 import React, { useState, useEffect } from 'react'
 import type { PreviewUnit, FlowDefinition } from '../../vite/preview-types'
 
+interface FlowStep {
+  id?: string
+  title?: string
+  description?: string
+  screen: string
+  state?: string
+  note?: string
+  trigger?: string
+}
+
+interface FlowConfig {
+  title?: string
+  description?: string
+  steps?: FlowStep[]
+}
+
 interface FlowPreviewProps {
   unit: PreviewUnit
 }
+
+// Detect if running in static build (no dev server)
+const isStaticBuild = typeof window !== 'undefined' &&
+  !window.location.hostname.includes('localhost') &&
+  !window.location.hostname.includes('127.0.0.1')
 
 export function FlowPreview({ unit }: FlowPreviewProps) {
   const [flow, setFlow] = useState<FlowDefinition | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  // Load flow definition
+  // Load flow definition - use config for static builds, fetch for dev
   useEffect(() => {
+    // For static builds, use the config data embedded in the unit
+    const config = unit.config as FlowConfig | undefined
+    if (config?.steps && config.steps.length > 0) {
+      setFlow({
+        name: config.title || unit.name,
+        description: config.description,
+        steps: config.steps,
+      } as FlowDefinition)
+      setLoading(false)
+      return
+    }
+
+    // Fall back to fetching for dev mode
     fetch(`/_preview-config/flows/${unit.name}`)
       .then(res => res.json())
       .then(data => {
@@ -19,7 +53,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [unit.name])
+  }, [unit.name, unit.config])
 
   if (loading) {
     return (
@@ -34,7 +68,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
   }
 
   // Fix 3: Zero-step flow handling
-  if (!flow || flow.steps.length === 0) {
+  if (!flow || !flow.steps || flow.steps.length === 0) {
     return (
       <div style={{
         padding: '32px',
@@ -59,8 +93,12 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
   const totalSteps = flow.steps.length
 
   // Build iframe URL for current step's screen
+  // Use static preview path for production, dev server for development
+  const basePath = typeof window !== 'undefined' ? window.location.pathname.split('/previews')[0] : ''
   const iframeUrl = step
-    ? `/_preview-runtime?preview=screens/${step.screen}${step.state ? `&state=${step.state}` : ''}`
+    ? (isStaticBuild
+        ? `${basePath}/_preview/screens/${step.screen}/`
+        : `/_preview-runtime?preview=screens/${step.screen}${step.state ? `&state=${step.state}` : ''}`)
     : ''
 
   return (
