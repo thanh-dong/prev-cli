@@ -149,14 +149,32 @@ export async function scanPreviewUnits(rootDir: string): Promise<PreviewUnit[]> 
       const configPath = existsSync(path.join(unitDir, 'config.yaml'))
         ? path.join(unitDir, 'config.yaml')
         : path.join(unitDir, 'config.yml')
-      const config = await parsePreviewConfig(configPath)
+      const configResult = await parsePreviewConfig(configPath, {
+        injectId: true,
+        injectKind: true,
+        folderName: name,
+        previewType: type,
+      })
+
+      // Log validation warnings
+      for (const warning of configResult.warnings) {
+        console.warn(`[prev] Warning in ${typeFolder}/${name}: ${warning}`)
+      }
+
+      // Skip units with validation errors (e.g., ID mismatch)
+      if (configResult.errors.length > 0) {
+        for (const error of configResult.errors) {
+          console.error(`[prev] Error in ${typeFolder}/${name}: ${error}`)
+        }
+        continue
+      }
 
       units.push({
         type,
         name,
         path: unitDir,
         route: `/_preview/${typeFolder}/${name}`,
-        config,
+        config: configResult.data,
         files,
       })
     }
@@ -178,8 +196,8 @@ async function detectUnitFiles(
   let index: string | undefined
 
   if (type === 'flow' || type === 'atlas') {
-    // Flow and Atlas use YAML index files
-    index = allFiles.find(f => f === 'index.yaml' || f === 'index.yml')
+    // Flow and Atlas are defined by their config.yaml (no separate index file)
+    index = allFiles.find(f => f === 'config.yaml' || f === 'config.yml')
   } else {
     // Component or Screen - look for TSX/JSX/TS/JS or HTML
     const priorities = [
