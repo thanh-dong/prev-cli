@@ -5,17 +5,20 @@ import { brand, colors } from '../../shared/data'
 export default function UpgradeSuccess() {
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'auto',
+      padding: '32px 0',
+      boxSizing: 'border-box',
       background: `linear-gradient(135deg, ${colors.primary} 0%, #7c3aed 100%)`,
       fontFamily: 'system-ui, sans-serif',
     }}>
       <div style={{
         backgroundColor: 'white',
         borderRadius: 24,
-        padding: 48,
+        padding: 36,
         maxWidth: 480,
         textAlign: 'center',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',

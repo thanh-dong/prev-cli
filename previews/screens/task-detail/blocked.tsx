@@ -13,12 +13,13 @@ export default function TaskDetailBlocked() {
   return (
     <div style={{
       display: 'flex',
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'hidden',
       fontFamily: 'system-ui, sans-serif',
     }}>
       <Sidebar activeItem="project" />
 
-      <main style={{ flex: 1, backgroundColor: colors.gray50 }}>
+      <main style={{ flex: 1, backgroundColor: colors.gray50, overflowY: 'auto' }}>
         {/* Breadcrumb */}
         <div style={{
           padding: '12px 32px',

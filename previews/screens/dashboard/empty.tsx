@@ -8,12 +8,13 @@ export default function DashboardEmpty() {
   return (
     <div style={{
       display: 'flex',
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'hidden',
       fontFamily: 'system-ui, sans-serif',
     }}>
       <Sidebar activeItem="dashboard" />
 
-      <main style={{ flex: 1, backgroundColor: colors.gray50 }}>
+      <main style={{ flex: 1, backgroundColor: colors.gray50, overflowY: 'auto' }}>
         <header style={{
           padding: '16px 32px',
           backgroundColor: 'white',
@@ -31,7 +32,7 @@ export default function DashboardEmpty() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: 'calc(100vh - 100px)',
+          flex: 1,
         }}>
           <div style={{
             backgroundColor: 'white',

@@ -6,14 +6,15 @@ import { colors, plans } from '../../shared/data'
 export default function PricingCurrentPlan() {
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'auto',
       backgroundColor: colors.gray50,
       fontFamily: 'system-ui, sans-serif',
-      padding: '64px 32px',
+      padding: '40px 32px',
     }}>
       <div style={{ maxWidth: 1000, margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ margin: '0 0 12px', fontSize: 36, fontWeight: 700, color: colors.gray900 }}>
             Manage your plan
           </h1>

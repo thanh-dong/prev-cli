@@ -24,12 +24,13 @@ export default function ProjectBoardFiltered() {
   return (
     <div style={{
       display: 'flex',
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'hidden',
       fontFamily: 'system-ui, sans-serif',
     }}>
       <Sidebar activeItem="project" />
 
-      <main style={{ flex: 1, backgroundColor: colors.gray50, display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, backgroundColor: colors.gray50, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         {/* Project Header */}
         <header style={{
           padding: '20px 32px',

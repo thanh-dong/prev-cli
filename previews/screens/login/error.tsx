@@ -5,16 +5,19 @@ import { brand, colors } from '../../shared/data'
 export default function LoginError() {
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'auto',
+      padding: '32px 0',
+      boxSizing: 'border-box',
       background: `linear-gradient(135deg, ${colors.primary} 0%, #7c3aed 100%)`,
       fontFamily: 'system-ui, sans-serif',
     }}>
       <div style={{
         background: 'white',
-        padding: 40,
+        padding: 32,
         borderRadius: 16,
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         width: '100%',
