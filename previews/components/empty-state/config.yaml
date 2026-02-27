@@ -1,7 +1,0 @@
-kind: component
-id: empty-state
-title: Empty State
-description: Zero-data state with icon and CTA
-status: stable
-schemaVersion: "2.0"
-tags: [component, empty, placeholder]

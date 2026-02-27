@@ -1,10 +1,10 @@
 kind: screen
 id: login
 title: Login
-description: User authentication with Workflow branding
+description: Centered auth card on branded gradient with email/password form
 status: stable
 schemaVersion: "2.0"
 tags: [screen, auth, form]
 states:
-  default: { description: "Login form ready for input" }
-  error: { description: "Invalid credentials error" }
+  default: { description: "Empty form with email and password fields, sign-in button" }
+  error: { description: "Red validation message below password field, fields retain input" }

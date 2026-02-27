@@ -2,11 +2,11 @@
 kind: screen
 id: pricing
 title: Pricing
-description: Plan comparison and selection
+description: Plan comparison grid with feature lists and CTAs
 status: stable
 schemaVersion: "2.0"
 tags: [screen, pricing, billing]
 states:
-  default: { description: "All plans displayed" }
-  current-plan: { description: "User's plan highlighted" }
-  trial: { description: "Trial countdown banner" }
+  default: { description: "Three plan cards (Free, Pro, Enterprise) with feature checklists and upgrade buttons" }
+  current-plan: { description: "User's active plan highlighted with 'Current Plan' badge" }
+  trial: { description: "Trial countdown banner at top with days remaining and urgent CTA" }

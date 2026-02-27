@@ -1,10 +1,10 @@
 kind: screen
 id: dashboard
 title: Dashboard
-description: Project overview and recent activity
+description: App shell with sidebar, project cards grid, activity feed, and task summary
 status: stable
 schemaVersion: "2.0"
 tags: [screen, dashboard, overview]
 states:
-  default: { description: "Projects and activity displayed" }
-  empty: { description: "No projects yet" }
+  default: { description: "Full dashboard with projects, activity feed, and task counts" }
+  empty: { description: "Zero-state with create-project prompt and empty activity feed" }

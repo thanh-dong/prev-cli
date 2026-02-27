@@ -2,9 +2,9 @@
 kind: screen
 id: upgrade-success
 title: Upgrade Success
-description: Plan upgrade confirmation
+description: Centered success confirmation on branded gradient
 status: stable
 schemaVersion: "2.0"
 tags: [screen, billing, success]
 states:
-  default: { description: "Upgrade complete" }
+  default: { description: "Checkmark icon, Pro plan confirmation, and go-to-dashboard button" }

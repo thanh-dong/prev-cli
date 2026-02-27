@@ -1,7 +1,7 @@
 kind: component
 id: task-card
 title: Task Card
-description: Kanban task card with status and assignee
+description: Compound kanban card with title, assignee avatar, tags, and status — three variants (default, blocked, completed)
 status: stable
 schemaVersion: "2.0"
 tags: [component, card, task]

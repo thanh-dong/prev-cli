@@ -1,10 +1,10 @@
 kind: screen
 id: signup
 title: Signup
-description: Account creation with Workflow branding
+description: Account creation form with branded layout
 status: stable
 schemaVersion: "2.0"
 tags: [screen, auth, form]
 states:
-  default: { description: "Signup form ready for input" }
-  success: { description: "Account created successfully" }
+  default: { description: "Empty form with name, email, password fields and create-account button" }
+  success: { description: "Success message with welcome text and continue button" }

@@ -1,7 +1,0 @@
-kind: component
-id: progress
-title: Progress
-description: Progress bar with percentage display
-status: stable
-schemaVersion: "2.0"
-tags: [component, progress, indicator]

@@ -1,7 +1,0 @@
-kind: component
-id: tag
-title: Tag
-description: Colored label for categorization
-status: stable
-schemaVersion: "2.0"
-tags: [component, label, category]

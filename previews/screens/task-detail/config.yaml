@@ -1,12 +1,12 @@
 kind: screen
 id: task-detail
 title: Task Detail
-description: Individual task view with comments
+description: Task view with sidebar, breadcrumb, details panel, and activity feed
 status: stable
 schemaVersion: "2.0"
 tags: [screen, task, detail]
 states:
-  default: { description: "Task detail view" }
-  editing: { description: "Edit mode active" }
-  completed: { description: "Task marked complete" }
-  blocked: { description: "Task is blocked" }
+  default: { description: "Read-only task with title, assignee, tags, and activity timeline" }
+  editing: { description: "Inline editing active on title and description fields" }
+  completed: { description: "Green completed badge, strikethrough title, confetti indicator" }
+  blocked: { description: "Red blocked badge with dependency link shown" }

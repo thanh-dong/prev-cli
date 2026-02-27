@@ -1,11 +1,11 @@
 kind: screen
 id: project-board
 title: Project Board
-description: Kanban board with task columns
+description: Kanban board with sidebar, project header, progress bar, and task columns
 status: stable
 schemaVersion: "2.0"
 tags: [screen, board, kanban, tasks]
 states:
-  default: { description: "Board with tasks in columns" }
-  empty: { description: "No tasks yet" }
-  filtered: { description: "Filter applied to tasks" }
+  default: { description: "Three columns (To Do, In Progress, Done) with task cards and progress bar" }
+  empty: { description: "Empty board with add-task prompt in each column" }
+  filtered: { description: "Subset of tasks visible, active filter chip shown in header" }
