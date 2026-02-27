@@ -1,42 +1,44 @@
-# ref-virtual-modules: Vite Virtual Module Pattern
+# ref-virtual-modules: Bun Virtual Module Pattern
+
+## Goal
+
+Generate runtime JavaScript modules at build time to inject dynamically discovered content (pages, previews, configuration) into the application without requiring static imports or build-time code generation.
 
 ## Pattern
 
-Virtual modules are dynamically generated ES modules that don't exist on disk. They're resolved and loaded by Vite plugins at build/serve time.
+Virtual modules are dynamically generated ES modules that don't exist on disk. They're resolved and loaded by Bun plugins using the `onResolve`/`onLoad` API at build time.
 
 ## Implementation
 
-### 1. Define Virtual Module ID
+### 1. Resolve the Module (onResolve)
 
 ```typescript
-const VIRTUAL_MODULE_ID = 'virtual:prev-pages'
-const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID
+build.onResolve({ filter: /^virtual:prev-/ }, (args) => ({
+  path: args.path,
+  namespace: 'prev-virtual',
+}))
 ```
 
-The `\0` prefix is a Rollup convention marking internal/virtual modules.
+The `namespace` isolates virtual modules from the filesystem resolver.
 
-### 2. Resolve the Module
+### 2. Load Module Content (onLoad)
 
 ```typescript
-resolveId(id) {
-  if (id === VIRTUAL_MODULE_ID) {
-    return RESOLVED_VIRTUAL_MODULE_ID
+build.onLoad({ filter: /.*/, namespace: 'prev-virtual' }, async (args) => {
+  switch (args.path) {
+    case 'virtual:prev-pages': {
+      const pages = await scanPages(rootDir)
+      return {
+        contents: `export const pages = ${JSON.stringify(pages)};`,
+        loader: 'js',
+      }
+    }
+    // ... other virtual modules
   }
-}
+})
 ```
 
-### 3. Load Module Content
-
-```typescript
-async load(id) {
-  if (id === RESOLVED_VIRTUAL_MODULE_ID) {
-    const data = await gatherData()
-    return `export const pages = ${JSON.stringify(data)};`
-  }
-}
-```
-
-### 4. Import in Client Code
+### 3. Import in Client Code
 
 ```typescript
 import { pages } from 'virtual:prev-pages'
@@ -44,38 +46,38 @@ import { pages } from 'virtual:prev-pages'
 
 ## Virtual Modules in prev-cli
 
-| Module | Plugin | Exports |
+| Module | Source | Exports |
 |--------|--------|---------|
-| `virtual:prev-pages` | pages-plugin | `pages`, `sidebar` |
-| `virtual:prev-page-modules` | pages-plugin | `pageModules` |
-| `virtual:prev-previews` | previews-plugin | `previewUnits`, `previews`, helpers |
-| `virtual:prev-config` | config-plugin | `config` |
+| `virtual:prev-pages` | virtual-modules plugin | `pages`, `sidebar` |
+| `virtual:prev-page-modules` | virtual-modules plugin | `pageModules` |
+| `virtual:prev-previews` | virtual-modules plugin | `previewUnits`, helpers |
+| `virtual:prev-config` | virtual-modules plugin | `config` |
+| `virtual:prev-tokens` | virtual-modules plugin | `tokens` |
 
-## HMR Handling
+## Live Reload
+
+In dev mode, file changes trigger a full rebuild via Bun.build() followed by SSE-based page reload. There is no granular HMR -- the entire theme app is rebuilt on change.
 
 ```typescript
-handleHotUpdate({ file, server }) {
-  if (isRelevantFile(file)) {
-    // Clear cached data
-    cache = null
-    // Invalidate virtual module
-    const mod = server.moduleGraph.getModuleById(RESOLVED_MODULE_ID)
-    if (mod) {
-      server.moduleGraph.invalidateModule(mod)
-      return [mod]
-    }
-  }
-}
+// Dev server watches for file changes
+watch(previewsDir, { recursive: true }, (_, filename) => {
+  scheduleRebuild() // Debounced Bun.build() + SSE notify
+})
 ```
+
+## Implementation Location
+
+All virtual modules are defined in `src/server/plugins/virtual-modules.ts`.
 
 ## Used By
 
 - [c3-202-pages-plugin](../c3-2-build/c3-202-pages-plugin.md)
 - [c3-203-previews-plugin](../c3-2-build/c3-203-previews-plugin.md)
 - [c3-205-config-plugin](../c3-2-build/c3-205-config-plugin.md)
+- [c3-208-tokens-plugin](../c3-2-build/c3-208-tokens-plugin.md)
 
 ## Notes
 
-- Virtual modules excluded from `optimizeDeps.include`
-- Content regenerated on HMR when source files change
+- Bun.build() supports plugins passed explicitly; Bun.serve()'s HTML import bundler does not
+- Content regenerated on rebuild when source files change
 - JSON.stringify used for data serialization

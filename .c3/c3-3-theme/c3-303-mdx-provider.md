@@ -67,6 +67,15 @@ Wraps tables in scrollable container for mobile:
 - **Internal:** `./Preview` for preview embedding
 - **External:** @tanstack/react-router Link
 
+## References
+
+- `src/theme/mdx-components.tsx` - MDX component mappings (MdxLink, MdxTable, Preview)
+- `src/theme/mdx-provider.tsx` - MDX provider wrapper component
+
+## Related Refs
+
+- [ref-theming](../refs/ref-theming.md) - CSS theming system
+
 ## Notes
 
 - Dead link warnings only appear in development

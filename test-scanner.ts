@@ -1,4 +1,4 @@
-import { scanPreviewUnits } from './src/vite/previews'
+import { scanPreviewUnits } from './src/content/previews'
 
 const units = await scanPreviewUnits('./test-scenario')
 console.log('Found', units.length, 'preview units:\n')

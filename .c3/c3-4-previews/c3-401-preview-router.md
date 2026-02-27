@@ -69,6 +69,19 @@ Switch on unit.type
 Type-specific viewer
 ```
 
+## References
+
+- `src/theme/previews/PreviewRouter.tsx` - Main router component that dispatches to type-specific viewers
+- `src/theme/previews/PreviewList.tsx` - Preview listing with filtering and card display
+- `src/theme/previews/ComponentPreview.tsx` - Component viewer integration
+- `src/theme/previews/ScreenPreview.tsx` - Screen viewer integration
+- `src/theme/previews/FlowPreview.tsx` - Flow viewer integration
+- `src/theme/previews/AtlasPreview.tsx` - Atlas viewer integration
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Shared preview type definitions
+
 ## Notes
 
 - Unit not found shows friendly error with expected path

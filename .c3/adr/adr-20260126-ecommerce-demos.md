@@ -1,7 +1,9 @@
 ---
 id: adr-20260126-ecommerce-demos
-status: accepted
+status: deprecated
 created: 2026-01-26
+deprecated: 2026-01-30
+deprecation-reason: Demo content removed in favor of Workflow design system demos
 approved-files:
   - previews/screens/pricing/config.yaml
   - previews/screens/pricing/index.tsx
@@ -13,6 +15,8 @@ approved-files:
 ---
 
 # ADR: E-commerce Demo Content
+
+> **⚠️ DEPRECATED:** This ADR was deprecated on 2026-01-30. The e-commerce demo content was removed in favor of Workflow design system demos. See commit `f2e06f1`.
 
 ## Problem
 

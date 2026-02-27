@@ -3,7 +3,7 @@ import { parseArgs } from 'util'
 import path from 'path'
 import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
-import { startDev, buildSite, previewSite } from './vite/start'
+import { startDev, buildSite, previewSite } from './server/start'
 import { validate, formatValidationResult } from './validators'
 import { typecheck, formatTypecheckResult } from './typecheck'
 import { migrateConfigs, formatMigrationResult } from './migrate'
@@ -62,7 +62,7 @@ Usage:
   prev migrate                Migrate configs from v1 to v2 format
   prev create [name]          Create preview in previews/<name>/ (default: "example")
   prev config [subcommand]    Manage configuration
-  prev clearcache             Clear Vite cache (.vite directory)
+  prev clearcache             Clear build cache
   prev clean [options]        Remove old prev-cli caches
 
 Config subcommands:
@@ -167,7 +167,7 @@ Examples:
 `)
 }
 
-async function clearViteCache(rootDir: string) {
+async function clearBuildCache(rootDir: string) {
   let cleared = 0
 
   // Clear the prev-cli cache in ~/.cache/prev/<hash>/
@@ -182,24 +182,8 @@ async function clearViteCache(rootDir: string) {
     // Ignore errors getting cache dir
   }
 
-  // Also check legacy locations
-  const viteCacheDir = path.join(rootDir, '.vite')
-  const nodeModulesVite = path.join(rootDir, 'node_modules', '.vite')
-
-  if (existsSync(viteCacheDir)) {
-    rmSync(viteCacheDir, { recursive: true })
-    cleared++
-    console.log(`  ✓ Removed .vite/`)
-  }
-
-  if (existsSync(nodeModulesVite)) {
-    rmSync(nodeModulesVite, { recursive: true })
-    cleared++
-    console.log(`  ✓ Removed node_modules/.vite/`)
-  }
-
   if (cleared === 0) {
-    console.log('  No Vite cache found')
+    console.log('  No build cache found')
   } else {
     console.log(`\n  Cleared ${cleared} cache director${cleared === 1 ? 'y' : 'ies'}`)
   }
@@ -496,7 +480,7 @@ async function main() {
         break
 
       case 'clearcache':
-        await clearViteCache(rootDir)
+        await clearBuildCache(rootDir)
         break
 
       case 'config':

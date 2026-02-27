@@ -51,7 +51,7 @@ Main entry point for the prev-cli application. Parses command-line arguments, lo
 ## Dependencies
 
 - **Internal:** [c3-102-config-loader](./c3-102-config-loader.md) for configuration
-- **Internal:** [c3-2-build](../c3-2-build/) for `startDev`, `buildSite`, `previewSite`
+- **Internal:** [c3-2-build](../c3-2-build/) for `startDev`, `buildSite`, `previewSite` (via `src/server/start.ts`)
 - **External:** `util.parseArgs`, `fs`, `path`
 
 ## Data Flow
@@ -69,6 +69,12 @@ Command dispatch (switch statement)
     ↓
 Exit with code 0/1
 ```
+
+## References
+
+- `src/cli.ts` - CLI entry point with command dispatch
+- `src/cli.ts:parseArgs()` - Argument parsing using util.parseArgs
+- `src/cli.ts:COMMANDS` - Command handler registry
 
 ## Notes
 

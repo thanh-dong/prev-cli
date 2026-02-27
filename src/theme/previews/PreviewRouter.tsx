@@ -4,7 +4,7 @@ import { ComponentPreview } from './ComponentPreview'
 import { ScreenPreview } from './ScreenPreview'
 import { FlowPreview } from './FlowPreview'
 import { AtlasPreview } from './AtlasPreview'
-import type { PreviewUnit } from '../../vite/preview-types'
+import type { PreviewUnit } from '../../content/preview-types'
 
 interface PreviewRouterProps {
   type: string

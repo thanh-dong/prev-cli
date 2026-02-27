@@ -67,6 +67,10 @@ Convert to VNodes
 - **Internal:** [c3-5-jsx](../c3-5-jsx/) for VNode output
 - **Internal:** [c3-601-types](./c3-601-types.md) for Primitive type
 
+## References
+
+- `src/primitives/template-renderer.ts` - Renders parsed primitive templates to concrete output formats
+
 ## Example
 
 ```typescript

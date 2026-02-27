@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { PreviewUnit, AtlasDefinition } from '../../vite/preview-types'
+import type { PreviewUnit, AtlasDefinition } from '../../content/preview-types'
 
 interface AtlasNode {
   id: string

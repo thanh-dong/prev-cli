@@ -43,11 +43,11 @@ export function Preview({ src, height = 400, title, mode = 'wasm', showHeader = 
 
   // In production, always use pre-built static previews
   // In dev, use WASM runtime for live bundling
-  const isDev = import.meta.env?.DEV ?? false
+  const isDev = import.meta.env.DEV ?? false
   const effectiveMode = isDev ? mode : 'legacy'
 
   // Get base URL for proper subpath deployment support
-  const baseUrl = (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+  const baseUrl = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
 
   // URL depends on mode - wasm mode needs src param, legacy uses pre-built files
   // Include state parameter if provided (for screen previews with multiple states)

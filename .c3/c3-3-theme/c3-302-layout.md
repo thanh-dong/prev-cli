@@ -63,6 +63,15 @@ prev-layout-floating
     └── children
 ```
 
+## References
+
+- `src/theme/Layout.tsx` - Main layout wrapper component with toolbar and state management
+- `src/theme/Layout.css` - Layout styles and responsive breakpoints
+
+## Related Refs
+
+- [ref-theming](../refs/ref-theming.md) - CSS theming system
+
 ## Notes
 
 - Preview detail pages get full viewport layout

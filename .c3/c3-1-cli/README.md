@@ -19,7 +19,7 @@ Command-line interface for prev-cli. Handles command dispatch, configuration loa
 
 | Command | Description |
 |---------|-------------|
-| `dev` | Start development server with HMR |
+| `dev` | Start development server with live reload |
 | `build` | Generate static site to ./dist/ |
 | `preview` | Serve production build locally |
 | `validate` | Validate preview configurations |
@@ -40,7 +40,7 @@ Command-line interface for prev-cli. Handles command dispatch, configuration loa
 
 ## Dependencies
 
-- **Internal:** [c3-2-build](../c3-2-build/) for Vite configuration
+- **Internal:** [c3-2-build](../c3-2-build/) for build system (dev/build/preview)
 - **External:** None (file system only)
 
 ## Data Flow

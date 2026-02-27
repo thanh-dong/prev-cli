@@ -79,6 +79,17 @@ order:
     - "guides/"
 ```
 
+## References
+
+- `src/config/loader.ts` - Configuration loading and saving
+- `src/config/loader.ts:findConfigFile()` - Config file discovery
+- `src/config/loader.ts:loadConfig()` - Config loading with defaults
+- `src/config/schema.ts` - PrevConfig interface definition
+
+## Related Refs
+
+- [ref-config-schema](../refs/ref-config-schema.md) - YAML configuration schema and defaults
+
 ## Notes
 
 - Returns `defaultConfig` if no config file found

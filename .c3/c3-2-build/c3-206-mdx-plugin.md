@@ -2,34 +2,29 @@
 
 ## Purpose
 
-Configures MDX transformation for markdown files, enabling React components in documentation.
+Bun plugin that compiles .md/.mdx files to React components using `@mdx-js/mdx`, enabling React components in documentation.
 
 ## Location
 
-Configured in `src/vite/config.ts` (uses `@mdx-js/rollup`)
+`src/server/plugins/mdx.ts`
 
 ## Responsibilities
 
-- Transform `.md` and `.mdx` files to React components
+- Transform `.md` and `.mdx` files to React components via `build.onLoad()`
 - Apply remark plugins for GitHub-flavored markdown
 - Apply rehype plugins for syntax highlighting
 - Configure MDX provider for component mapping
+- Skip files outside rootDir (e.g., node_modules)
 
 ## Configuration
 
 ```typescript
-mdx({
+const compiled = await compile(source, {
   remarkPlugins: [remarkGfm],
   rehypePlugins: [rehypeHighlight],
   providerImportSource: '@mdx-js/react',
-  include: [
-    path.join(rootDir, '**/*.md'),
-    path.join(rootDir, '**/*.mdx'),
-  ],
-  exclude: [
-    '**/node_modules/**',
-    '**/.git/**',
-  ],
+  development: false,
+  jsx: false, // Output JS, not JSX
 })
 ```
 
@@ -41,9 +36,15 @@ mdx({
 ### Rehype Plugins
 - **rehype-highlight**: Code syntax highlighting
 
+## Key Implementation Details
+
+- Lazy-loads `@mdx-js/mdx`, `remark-gfm`, and `rehype-highlight` to avoid top-level import cost
+- Forces `development: false` and `jsx: false` to output JS (avoids `_jsxDEV` errors)
+- Returns compiled output with `loader: 'jsx'` for Bun.build
+
 ## Dependencies
 
-- **External:** `@mdx-js/rollup` - Rollup/Vite MDX plugin
+- **External:** `@mdx-js/mdx` - MDX compiler
 - **External:** `remark-gfm` - GitHub-flavored markdown
 - **External:** `rehype-highlight` - Syntax highlighting
 
@@ -61,6 +62,12 @@ export const mdxComponents = {
   // ...
 }
 ```
+
+## References
+
+- `src/server/plugins/mdx.ts` - Bun plugin implementation
+- `src/theme/mdx-components.tsx` - MDX component mapping (h1, h2, code, pre, Preview, etc.)
+- `src/theme/components/Preview.tsx` - Preview component for embedding previews in MDX
 
 ## Notes
 

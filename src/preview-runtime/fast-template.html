@@ -50,18 +50,22 @@
     // Fast preview runtime - uses server-side bundled code
     const params = new URLSearchParams(window.location.search)
     const src = params.get('src')
+    const state = params.get('state')
 
     if (!src) {
       document.getElementById('root').innerHTML = '<div class="preview-error">No preview source specified</div>'
     } else {
       const startTime = performance.now()
+      const bundleUrl = state
+        ? `/_preview-bundle/${src}?state=${encodeURIComponent(state)}`
+        : `/_preview-bundle/${src}`
 
       try {
         // Pre-fetch tokens, JSX, and bundle in parallel
         const [tokensRes, jsxModule, bundleResponse] = await Promise.all([
           fetch('/_prev/tokens.json').then(r => r.json()).catch(() => null),
           import(`${window.location.origin}/_prev/jsx.js`),
-          fetch(`/_preview-bundle/${src}`)
+          fetch(bundleUrl)
         ])
 
         // Set tokens

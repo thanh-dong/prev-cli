@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from '@tanstack/react-router'
 import type { PageTree } from 'fumadocs-core/server'
-import { previews } from 'virtual:prev-previews'
+import { previewUnits } from 'virtual:prev-previews'
 import { Icon } from './icons'
 import { useDevTools } from './DevToolsContext'
 import './Toolbar.css'
@@ -76,7 +76,7 @@ export function Toolbar({ tree, onThemeToggle, onWidthToggle, isDark, isFullWidt
         <Icon name="menu" size={18} />
       </button>
 
-      {previews && previews.length > 0 && (
+      {previewUnits && previewUnits.length > 0 && (
         <Link to="/previews" className={`toolbar-btn ${isOnPreviews ? 'active' : ''}`} title="Previews">
           <Icon name="grid" size={18} />
         </Link>

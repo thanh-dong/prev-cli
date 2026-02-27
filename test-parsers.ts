@@ -1,4 +1,4 @@
-import { parsePreviewConfig, parseFlowDefinition, parseAtlasDefinition } from './src/vite/config-parser'
+import { parsePreviewConfig, parseFlowDefinition, parseAtlasDefinition } from './src/content/config-parser'
 
 console.log('=== Testing Config Parser ===\n')
 

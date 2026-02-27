@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import type { PreviewUnit } from '../../vite/preview-types'
+import type { PreviewUnit } from '../../content/preview-types'
 
 interface PreviewMessage {
   type: 'ready' | 'init' | 'update' | 'built' | 'error'
@@ -29,7 +29,7 @@ export function ComponentPreview({ unit }: ComponentPreviewProps) {
   // Load schema if available
   useEffect(() => {
     if (unit.files.schema) {
-      import(/* @vite-ignore */ `/_preview/components/${unit.name}/${unit.files.schema}`)
+      import(`/_preview/components/${unit.name}/${unit.files.schema}`)
         .then(mod => setSchema(mod.schema))
         .catch(() => {})
     }
@@ -37,7 +37,7 @@ export function ComponentPreview({ unit }: ComponentPreviewProps) {
 
   // Build iframe URL - use static path for production, runtime for dev
   const baseUrl = typeof window !== 'undefined'
-    ? (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+    ? (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
     : ''
   const iframeUrl = isStaticBuild
     ? `${baseUrl}/_preview/components/${unit.name}/`

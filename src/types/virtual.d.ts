@@ -23,7 +23,7 @@ declare module 'virtual:prev-page-modules' {
 }
 
 declare module 'virtual:prev-previews' {
-  import type { PreviewUnit } from '../vite/preview-types'
+  import type { PreviewUnit } from '../content/preview-types'
 
   export interface Preview {
     name: string
@@ -66,7 +66,7 @@ declare module '*.md' {
   export default component
 }
 
-// Vite's import.meta.glob support
+// import.meta.glob support
 interface ImportMeta {
   glob<T = unknown>(
     pattern: string,

@@ -81,6 +81,10 @@ const Card = defineComponent({
 - **Internal:** [c3-501-vnode](./c3-501-vnode.md), [c3-502-jsx-runtime](./c3-502-jsx-runtime.md)
 - **External:** `zod` for props validation
 
+## References
+
+- `src/jsx/define-component.ts` - Component definition API with typed props and slots
+
 ## Notes
 
 - Props validated at render time

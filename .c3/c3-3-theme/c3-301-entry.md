@@ -63,6 +63,15 @@ RouterProvider
 Layout + Page content
 ```
 
+## References
+
+- `src/theme/entry.tsx` - React application entry point with routing setup
+- `src/theme/index.ts` - Main theme exports and barrel file
+
+## Related Refs
+
+- [ref-theming](../refs/ref-theming.md) - CSS theming system
+
 ## Notes
 
 - Supports GitHub Pages with BASE_URL

@@ -86,6 +86,14 @@ Iframe loads different state file
 | Tablet | 768px | Tablet viewport |
 | Mobile | 375px | Phone viewport |
 
+## References
+
+- `src/theme/previews/ScreenPreview.tsx` - Screen viewer (placeholder - currently uses generic Preview component)
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Preview unit type definitions
+
 ## Notes
 
 - States can be separate files or query params

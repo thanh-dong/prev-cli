@@ -33,7 +33,7 @@ function routeExists(href: string): boolean {
 // Custom link component that validates internal links and uses router
 function MdxLink({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   const isInternal = isInternalLink(href || '')
-  const isDev = import.meta.env?.DEV ?? false
+  const isDev = import.meta.env.DEV ?? false
 
   // For internal links, use TanStack Router's Link
   if (isInternal && href) {

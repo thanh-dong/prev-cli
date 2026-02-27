@@ -92,6 +92,14 @@ prev validate              # Validate all preview configs
 prev validate -r react     # Validate only react renderer
 ```
 
+## References
+
+- `src/validators/index.ts` - Validation orchestration
+- `src/validators/schema-validator.ts` - JSON Schema validation
+- `src/validators/schema-validator.ts:validateAgainstSchema()` - Schema validation function
+- `src/validators/semantic-validator.ts` - Semantic validation
+- `src/validators/semantic-validator.ts:validateSemantics()` - Cross-reference validation
+
 ## Notes
 
 - v1 configs (missing kind) get warnings, not errors

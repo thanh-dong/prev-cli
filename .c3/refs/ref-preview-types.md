@@ -1,5 +1,9 @@
 # ref-preview-types: Preview Type Hierarchy
 
+## Goal
+
+Establish a clear taxonomy for preview documentation that supports four distinct documentation needs: reusable components, screen states, user flows, and information architecture, each with appropriate configuration schemas and rendering strategies.
+
 ## Pattern
 
 Previews are categorized into four distinct types, each with specific use cases and configuration schemas.

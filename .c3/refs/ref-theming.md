@@ -1,5 +1,9 @@
 # ref-theming: CSS Theming with Variables
 
+## Goal
+
+Enable seamless switching between light, dark, and system-preferred color schemes while maintaining consistent visual hierarchy and accessibility across all documentation pages.
+
 ## Pattern
 
 Theme switching uses CSS custom properties (variables) with a `dark` class on the root element.

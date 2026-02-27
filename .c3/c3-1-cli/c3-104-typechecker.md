@@ -109,6 +109,13 @@ prev typecheck              # Type check all previews
 prev typecheck --verbose    # Show resolved paths
 ```
 
+## References
+
+- `src/typecheck/index.ts` - Type checking implementation
+- `src/typecheck/index.ts:typecheck()` - Main typecheck function
+- `src/typecheck/index.ts:getTsgoPath()` - tsgo binary resolution
+- `src/typecheck/index.ts:getTypeRootsPath()` - @types resolution
+
 ## Notes
 
 - tsgo is ~10x faster than JavaScript tsc

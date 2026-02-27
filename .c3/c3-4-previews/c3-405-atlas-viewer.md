@@ -98,6 +98,14 @@ Render visual graph
 function detectCycles(nodes, relationships): string[][]
 ```
 
+## References
+
+- `src/theme/previews/AtlasPreview.tsx` - Atlas viewer (single file with hierarchy tree, node cards, cycle detection)
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Preview unit type definitions
+
 ## Notes
 
 - Useful for documenting site navigation structure

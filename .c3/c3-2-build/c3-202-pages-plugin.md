@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Vite plugin that scans markdown/MDX files, parses frontmatter, and generates virtual modules for page data and sidebar navigation.
+Content scanner that discovers markdown/MDX files, parses frontmatter, and provides page data for virtual module generation. Virtual modules are served via the Bun plugin in `src/server/plugins/virtual-modules.ts`.
 
 ## Location
 
-`src/vite/plugins/pages-plugin.ts`, `src/vite/pages.ts`
+`src/server/plugins/virtual-modules.ts` (virtual module generation), `src/content/pages.ts` (page scanning and sidebar building)
 
 ## Responsibilities
 
@@ -89,9 +89,20 @@ Build page list + sidebar tree
 Virtual module code generation
 ```
 
-## HMR
+## Live Reload
 
-Invalidates cached pages when any `.md`/`.mdx` file changes, triggering re-scan and module regeneration.
+In dev mode, file watcher triggers full rebuild and SSE reload when `.md`/`.mdx` files change (see [c3-209](./c3-209-dev-server.md)).
+
+## References
+
+- `src/content/pages.ts` - Page scanning and sidebar tree building functions
+- `src/content/pages.ts:scanPages()` - Scans project for .md/.mdx files
+- `src/content/pages.ts:buildSidebarTree()` - Builds sidebar tree structure from pages
+- `src/server/plugins/virtual-modules.ts` - Virtual module generation via Bun plugin API
+
+## Related Refs
+
+- [ref-virtual-modules](../refs/ref-virtual-modules.md) - Bun virtual module pattern for runtime code generation
 
 ## Notes
 

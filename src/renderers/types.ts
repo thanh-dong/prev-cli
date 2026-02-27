@@ -170,7 +170,7 @@ export interface DevServer {
  * Renderer adapter interface - implementations for React, HTML, Solid, etc.
  *
  * The adapter interface is intentionally thin. Bundling, asset management,
- * and hydration are handled by the build system (Vite/esbuild), not the adapter.
+ * and hydration are handled by the build system (Bun.build), not the adapter.
  */
 export interface RendererAdapter {
   /**

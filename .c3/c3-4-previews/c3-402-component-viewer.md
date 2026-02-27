@@ -75,6 +75,14 @@ PostMessage to iframe
 Component re-renders
 ```
 
+## References
+
+- `src/theme/previews/ComponentPreview.tsx` - Component viewer (placeholder - currently uses generic Preview component)
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Preview unit type definitions
+
 ## Notes
 
 - Schema.ts defines prop types and defaults

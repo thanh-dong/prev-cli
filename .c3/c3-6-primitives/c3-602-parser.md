@@ -65,6 +65,10 @@ parsePrimitive('$text(size=lg, weight=bold)')
 
 - **Internal:** [c3-601-types](./c3-601-types.md) for Primitive type
 
+## References
+
+- `src/primitives/parser.ts` - Parses single primitive strings into structured objects
+
 ## Notes
 
 - Leading `$` is required

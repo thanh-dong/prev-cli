@@ -1,5 +1,9 @@
 # ref-config-schema: YAML Configuration Schema
 
+## Goal
+
+Provide a consistent, validated configuration format for prev-cli projects that supports both global settings (`.prev.yaml`) and preview-specific configurations, with sensible defaults and clear schema definitions.
+
 ## Pattern
 
 Configuration uses YAML files with optional keys and sensible defaults. Validation applies defaults for missing values.

@@ -125,7 +125,7 @@ function loadPartialTokens(filePath: string): PartialTokensConfig {
 export function resolveTokens(options: ResolveTokensOptions = {}): TokensConfig {
   const { userTokens, defaultsPath } = options
 
-  // Check for user tokens path from Vite plugin or options
+  // Check for user tokens path from build plugin or options
   let userTokensPath = options.userTokensPath
   if (!userTokensPath && typeof globalThis !== 'undefined') {
     userTokensPath = (globalThis as any).__PREV_USER_TOKENS_PATH

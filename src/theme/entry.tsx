@@ -15,8 +15,8 @@ import {
 import { MDXProvider } from '@mdx-js/react'
 import { pages, sidebar } from 'virtual:prev-pages'
 import { pageModules } from 'virtual:prev-page-modules'
-import { previews, previewUnits } from 'virtual:prev-previews'
-import type { PreviewUnit, PreviewType } from '../vite/preview-types'
+import { previewUnits } from 'virtual:prev-previews'
+import type { PreviewUnit, PreviewType } from '../content/preview-types'
 import { Preview } from './Preview'
 import { TokensPage } from './previews/TokensPage'
 import { useDiagrams } from './diagrams'
@@ -186,6 +186,7 @@ function CategorySection({ type, units }: { type: PreviewType; units: PreviewUni
               name={fullName}
               title={unit.config?.title}
               status={unit.config?.status}
+              type={unit.type}
             />
           )
         })}
@@ -196,21 +197,9 @@ function CategorySection({ type, units }: { type: PreviewType; units: PreviewUni
 
 // Previews catalog - Storybook-like gallery with categorized sections
 function PreviewsCatalog() {
-  // Use previewUnits for categorization, fall back to legacy previews
   const units = previewUnits || []
-  const legacyPreviews = previews || []
 
-  // If no units but have legacy previews, convert them
-  const allUnits: PreviewUnit[] = units.length > 0 ? units : legacyPreviews.map((p: { name: string; route: string }) => ({
-    type: 'component' as PreviewType,
-    name: p.name,
-    path: '',
-    route: p.route,
-    config: null,
-    files: { index: '' },
-  }))
-
-  if (allUnits.length === 0) {
+  if (units.length === 0) {
     return (
       <div style={{ padding: '40px 20px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
@@ -232,8 +221,8 @@ function PreviewsCatalog() {
     )
   }
 
-  const grouped = groupByType(allUnits)
-  const totalCount = allUnits.length
+  const grouped = groupByType(units)
+  const totalCount = units.length
 
   return (
     <div className="previews-catalog">
@@ -266,19 +255,22 @@ function PreviewsCatalog() {
 // Individual preview card - clickable thumbnail with WASM preview communication
 import type { PreviewConfig, PreviewMessage } from '../preview-runtime/types'
 
-function PreviewCard({ name, title, status }: { name: string; title?: string; status?: 'draft' | 'stable' | 'deprecated' }) {
+function PreviewCard({ name, title, status, type }: { name: string; title?: string; status?: 'draft' | 'stable' | 'deprecated'; type?: PreviewType }) {
+  // Config-only types (flow/atlas) have no JS entry point — show a styled placeholder instead of iframe
+  const isConfigOnly = type === 'flow' || type === 'atlas'
+
   const iframeRef = React.useRef<HTMLIFrameElement>(null)
   // In production, start as loaded since static files are fast
-  const isDev = import.meta.env?.DEV ?? false
-  const [isLoaded, setIsLoaded] = React.useState(!isDev)
+  const isDev = import.meta.env.DEV ?? false
+  const [isLoaded, setIsLoaded] = React.useState(!isDev || isConfigOnly)
   const [loadError, setLoadError] = React.useState(false)
 
-  const baseUrl = (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
-  const previewUrl = isDev ? `/_preview-runtime?src=${name}` : `${baseUrl}/_preview/${name}/`
+  const baseUrl = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
+  const previewUrl = isConfigOnly ? '' : (isDev ? `/_preview-runtime?src=${name}` : `${baseUrl}/_preview/${name}/`)
 
   // Timeout for loading - only needed in dev mode
   React.useEffect(() => {
-    if (!isDev) return
+    if (!isDev || isConfigOnly) return
 
     const timeout = setTimeout(() => {
       if (!isLoaded) {
@@ -287,11 +279,11 @@ function PreviewCard({ name, title, status }: { name: string; title?: string; st
     }, 5000)
 
     return () => clearTimeout(timeout)
-  }, [isLoaded, isDev])
+  }, [isLoaded, isDev, isConfigOnly])
 
   // Set up WASM preview communication for thumbnail (dev mode only)
   React.useEffect(() => {
-    if (!isDev) return
+    if (!isDev || isConfigOnly) return
 
     const iframe = iframeRef.current
     if (!iframe) return
@@ -334,30 +326,40 @@ function PreviewCard({ name, title, status }: { name: string; title?: string; st
     <Link to={`/previews/${name}`} className="preview-card">
       {/* Thumbnail preview */}
       <div className="preview-card-thumbnail">
-        {/* Loading state */}
-        {!isLoaded && !loadError && (
-          <div className="preview-card-loading">
-            <div className="preview-card-spinner" />
+        {isConfigOnly ? (
+          /* Config-only types: styled placeholder with category icon */
+          <div className="preview-card-placeholder" style={{ opacity: 1 }}>
+            <span style={{ fontSize: '32px' }}>{type === 'flow' ? '⇢' : '◎'}</span>
+            <span>{type === 'flow' ? 'Flow' : 'Atlas'}</span>
           </div>
+        ) : (
+          <>
+            {/* Loading state */}
+            {!isLoaded && !loadError && (
+              <div className="preview-card-loading">
+                <div className="preview-card-spinner" />
+              </div>
+            )}
+            {/* Error/timeout placeholder */}
+            {loadError && (
+              <div className="preview-card-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M9 9l6 6m0-6l-6 6" />
+                </svg>
+                <span>Preview</span>
+              </div>
+            )}
+            <iframe
+              ref={iframeRef}
+              src={previewUrl}
+              className="preview-card-iframe"
+              style={{ opacity: isLoaded && !loadError ? 1 : 0 }}
+              title={name}
+              loading="lazy"
+            />
+          </>
         )}
-        {/* Error/timeout placeholder */}
-        {loadError && (
-          <div className="preview-card-placeholder">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M9 9l6 6m0-6l-6 6" />
-            </svg>
-            <span>Preview</span>
-          </div>
-        )}
-        <iframe
-          ref={iframeRef}
-          src={previewUrl}
-          className="preview-card-iframe"
-          style={{ opacity: isLoaded && !loadError ? 1 : 0 }}
-          title={name}
-          loading="lazy"
-        />
       </div>
       {/* Card footer */}
       <div className="preview-card-footer">
@@ -395,8 +397,8 @@ function PreviewEmbed() {
   const name = (params as any)['_splat'] || (params as any)['*'] || ''
 
   // In production, always use pre-built static files
-  const isDev = import.meta.env?.DEV ?? false
-  const baseUrl = (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+  const isDev = import.meta.env.DEV ?? false
+  const baseUrl = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
 
   // Parse type from name (e.g., "flows/checkout" -> type="flow", unitName="checkout")
   const match = name.match(/^(components|screens|flows|atlas)\/(.+)$/)
@@ -632,7 +634,7 @@ const routeTree = rootRoute.addChildren([
   ...pageRoutes,
 ])
 // Get base path for subpath deployments (e.g., GitHub Pages)
-const basepath = (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '') || '/'
+const basepath = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '') || '/'
 
 const router = createRouter({
   routeTree,

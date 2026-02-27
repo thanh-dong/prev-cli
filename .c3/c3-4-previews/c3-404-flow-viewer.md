@@ -92,6 +92,14 @@ User clicks Next
 Follow transition to next step
 ```
 
+## References
+
+- `src/theme/previews/FlowPreview.tsx` - Flow viewer (single file with step navigation, progress dots, iframe embedding)
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Preview unit type definitions
+
 ## Notes
 
 - Flows reference screens by ID

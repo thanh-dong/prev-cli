@@ -23,9 +23,13 @@ Check out the preview:
 <Preview src="demo" />
 `)
 
-  // Create preview directory structure with React component
-  await mkdir(join(testDir, 'previews/demo'), { recursive: true })
-  await writeFile(join(testDir, 'previews/demo/App.tsx'), `export default function App() {
+  // Create preview directory structure with React component (using typed folder)
+  await mkdir(join(testDir, 'previews/components/demo'), { recursive: true })
+  await writeFile(join(testDir, 'previews/components/demo/config.yaml'), `title: Demo Component
+description: A demo component for testing
+tags: [test]
+`)
+  await writeFile(join(testDir, 'previews/components/demo/App.tsx'), `export default function App() {
   return (
     <div style={{ fontFamily: 'system-ui', padding: '2rem' }}>
       <h1 style={{ color: '#3b82f6' }}>Demo Component</h1>
@@ -96,19 +100,19 @@ describe('preview feature integration', () => {
     expect(assets.some(f => f.endsWith('.css'))).toBe(true)
 
     // Verify preview files are copied to dist/_preview/
-    const previewIndexExists = await Bun.file(join(testDir, 'dist', '_preview', 'demo', 'index.html')).exists()
+    const previewIndexExists = await Bun.file(join(testDir, 'dist', '_preview', 'components', 'demo', 'index.html')).exists()
     expect(previewIndexExists).toBe(true)
   }, 120000)
 
-  test('scanPreviews finds preview directories', async () => {
+  test('scanPreviewUnits finds typed preview directories', async () => {
     // Import and test the scanning functionality directly
-    const { scanPreviews } = await import('../src/vite/previews')
+    const { scanPreviewUnits } = await import('../src/content/previews')
 
-    const previews = await scanPreviews(testDir)
-    expect(previews).toHaveLength(1)
-    expect(previews[0].name).toBe('demo')
-    expect(previews[0].route).toBe('/_preview/demo')
-    expect(previews[0].htmlPath).toContain('previews/demo/App.tsx')
+    const units = await scanPreviewUnits(testDir)
+    expect(units).toHaveLength(1)
+    expect(units[0].name).toBe('demo')
+    expect(units[0].type).toBe('component')
+    expect(units[0].route).toBe('/_preview/components/demo')
   })
 
   test('dev server starts and serves main page', async () => {

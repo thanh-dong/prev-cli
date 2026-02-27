@@ -51,6 +51,16 @@ interface ToolbarProps {
 - Smooth transitions on hover/active
 - Responsive sizing
 
+## References
+
+- `src/theme/Toolbar.tsx` - Floating toolbar pill component
+- `src/theme/Toolbar.css` - Toolbar positioning and visual styles
+- `src/theme/icons.tsx` - SVG icon sprite and icon components
+
+## Related Refs
+
+- [ref-theming](../refs/ref-theming.md) - CSS theming system
+
 ## Notes
 
 - Previews button only shown if previews exist

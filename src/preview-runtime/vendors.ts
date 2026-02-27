@@ -1,10 +1,27 @@
-import { build } from 'esbuild'
-import { dirname, join } from 'path'
+import { join, dirname } from 'path'
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
+import { tmpdir } from 'os'
 
-// Resolve from CLI's location, not user's project (React is our dependency)
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const srcDir = join(__dirname, '..')
+// Find CLI root for module resolution (React is our dependency)
+function findCliRoot(): string {
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (let i = 0; i < 10; i++) {
+    const pkgPath = join(dir, 'package.json')
+    if (existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
+        if (pkg.name === 'prev-cli') return dir
+      } catch {}
+    }
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return dirname(dirname(fileURLToPath(import.meta.url)))
+}
+
+const cliRoot = findCliRoot()
 
 export interface VendorBundleResult {
   success: boolean
@@ -32,26 +49,34 @@ export async function buildVendorBundle(): Promise<VendorBundleResult> {
       export default React
     `
 
-    const result = await build({
-      stdin: {
-        contents: entryCode,
-        loader: 'ts',
-        resolveDir: __dirname, // Resolve React from CLI's node_modules
-      },
-      bundle: true,
-      write: false,
-      format: 'esm',
-      target: 'es2020',
-      minify: true,
-    })
+    // Write temp file in CLI root so React can be resolved from node_modules
+    const tempDir = mkdtempSync(join(cliRoot, '.tmp-vendor-'))
+    const entryPath = join(tempDir, 'entry.ts')
 
-    // Select JS output file explicitly (in case sourcemaps are added later)
-    const jsFile = result.outputFiles?.find(f => f.path.endsWith('.js')) || result.outputFiles?.[0]
-    if (!jsFile) {
-      return { success: false, code: '', error: 'No output generated' }
+    try {
+      writeFileSync(entryPath, entryCode)
+
+      const result = await Bun.build({
+        entrypoints: [entryPath],
+        format: 'esm',
+        target: 'browser',
+        minify: true,
+      })
+
+      if (!result.success) {
+        const errors = result.logs.filter(l => l.level === 'error').map(l => l.message).join('; ')
+        return { success: false, code: '', error: errors || 'Build failed' }
+      }
+
+      const jsFile = result.outputs.find(f => f.path.endsWith('.js')) || result.outputs[0]
+      if (!jsFile) {
+        return { success: false, code: '', error: 'No output generated' }
+      }
+
+      return { success: true, code: await jsFile.text() }
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
     }
-
-    return { success: true, code: jsFile.text }
   } catch (err) {
     return {
       success: false,
@@ -61,38 +86,12 @@ export async function buildVendorBundle(): Promise<VendorBundleResult> {
   }
 }
 
-// Import jsx modules at build time so they're bundled into the CLI
-import * as jsxModule from '../jsx/index'
-
 /**
  * Build @prev/jsx bundle for static preview builds
- * The jsx code is bundled into the CLI, we just need to create a runtime bundle
+ * React is externalized, so temp dir location doesn't matter for resolution
  */
 export async function buildJsxBundle(vendorPath: string): Promise<VendorBundleResult> {
   try {
-    // Get the export names from the jsx module
-    const exportNames = Object.keys(jsxModule).filter(k => k !== 'default')
-
-    // Create entry that re-exports from the bundled jsx module
-    // We build this fresh to ensure React imports point to vendor bundle
-    const jsxEntry = `
-      import * as React from 'react'
-      import { jsx, jsxs, Fragment } from 'react/jsx-runtime'
-
-      // VNode and schemas
-      ${jsxModule.VNode ? `export const VNode = ${jsxModule.VNode.toString()}` : ''}
-      export const createVNode = ${jsxModule.createVNode.toString()}
-      export const normalizeChildren = ${jsxModule.normalizeChildren.toString()}
-
-      // Primitives re-export (these use the jsx runtime)
-      export { Box, Text, Col, Row, Spacer, Slot, Icon, Image, Fragment } from './jsx-runtime-inline'
-
-      // React adapter
-      export { toReact, setTokensConfig } from './react-adapter-inline'
-    `
-
-    // For now, create a minimal bundle that works with the primitives
-    // This is a simplified approach - full solution would pre-bundle during CLI build
     const minimalJsx = `
       import * as React from 'react'
 
@@ -202,35 +201,44 @@ export async function buildJsxBundle(vendorPath: string): Promise<VendorBundleRe
       }
     `
 
-    const result = await build({
-      stdin: {
-        contents: minimalJsx,
-        loader: 'ts',
-        resolveDir: __dirname,
-      },
-      bundle: true,
-      write: false,
-      format: 'esm',
-      target: 'es2020',
-      minify: true,
-      plugins: [
-        {
-          name: 'jsx-externals',
-          setup(build) {
-            build.onResolve({ filter: /^react(-dom)?(\/.*)?$/ }, () => {
-              return { path: vendorPath, external: true }
-            })
+    // React is externalized via plugin, so temp dir location doesn't matter
+    const tempDir = mkdtempSync(join(tmpdir(), 'prev-jsx-'))
+    const entryPath = join(tempDir, 'entry.ts')
+
+    try {
+      writeFileSync(entryPath, minimalJsx)
+
+      const result = await Bun.build({
+        entrypoints: [entryPath],
+        format: 'esm',
+        target: 'browser',
+        minify: true,
+        plugins: [
+          {
+            name: 'jsx-externals',
+            setup(build) {
+              build.onResolve({ filter: /^react(-dom)?(\/.*)?$/ }, () => {
+                return { path: vendorPath, external: true }
+              })
+            },
           },
-        },
-      ],
-    })
+        ],
+      })
 
-    const jsFile = result.outputFiles?.find(f => f.path.endsWith('.js')) || result.outputFiles?.[0]
-    if (!jsFile) {
-      return { success: false, code: '', error: 'No output generated' }
+      if (!result.success) {
+        const errors = result.logs.filter(l => l.level === 'error').map(l => l.message).join('; ')
+        return { success: false, code: '', error: errors || 'Build failed' }
+      }
+
+      const jsFile = result.outputs.find(f => f.path.endsWith('.js')) || result.outputs[0]
+      if (!jsFile) {
+        return { success: false, code: '', error: 'No output generated' }
+      }
+
+      return { success: true, code: await jsFile.text() }
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
     }
-
-    return { success: true, code: jsFile.text }
   } catch (err) {
     return {
       success: false,

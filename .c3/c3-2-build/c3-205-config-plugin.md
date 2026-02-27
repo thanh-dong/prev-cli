@@ -2,17 +2,18 @@
 
 ## Purpose
 
-Vite plugin that injects runtime configuration into the client bundle via a virtual module.
+Injects runtime configuration into the client bundle via the `virtual:prev-config` virtual module, and provides a dev-mode route for config updates.
 
 ## Location
 
-`src/vite/plugins/config-plugin.ts`
+`src/server/plugins/virtual-modules.ts` (virtual module), `src/server/routes/preview-config.ts` (dev route handler)
 
 ## Responsibilities
 
-- Create virtual module `virtual:prev-config`
+- Create virtual module `virtual:prev-config` via Bun plugin onResolve/onLoad
 - Inject user's `.prev.yaml` settings into client code
 - Enable runtime access to theme, contentWidth, and other settings
+- Serve preview config as JSON via `/_preview-config/*` route in dev mode
 
 ## Virtual Module
 
@@ -24,12 +25,6 @@ export const config: {
   contentWidth: 'constrained' | 'full'
   // ... other config fields
 }
-```
-
-## API
-
-```typescript
-function createConfigPlugin(config: PrevConfig): Plugin
 ```
 
 ## Dependencies
@@ -46,6 +41,16 @@ if (config.theme === 'dark') {
   // Apply dark mode
 }
 ```
+
+## References
+
+- `src/server/plugins/virtual-modules.ts` - Virtual module generation (case `virtual:prev-config`)
+- `src/server/routes/preview-config.ts` - Dev route handler for preview configs
+
+## Related Refs
+
+- [ref-config-schema](../refs/ref-config-schema.md) - YAML configuration schema
+- [ref-virtual-modules](../refs/ref-virtual-modules.md) - Bun virtual module pattern
 
 ## Notes
 

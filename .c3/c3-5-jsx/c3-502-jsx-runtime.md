@@ -75,6 +75,10 @@ const layout = Col({ gap: 16, padding: 24 },
 
 - **Internal:** [c3-501-vnode](./c3-501-vnode.md) for VNode creation
 
+## References
+
+- `src/jsx/jsx-runtime.ts` - JSX primitive components (Col, Row, Box, Text, etc.)
+
 ## Notes
 
 - All primitives return VNodes

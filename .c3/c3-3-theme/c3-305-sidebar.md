@@ -55,6 +55,16 @@ When items are reordered:
 - Indentation for nested items
 - Active state highlighting
 
+## References
+
+- `src/theme/TOCPanel.tsx` - Table of Contents panel with navigation tree
+- `src/theme/TOCPanel.css` - TOC panel styling and drag-drop visual states
+- `src/theme/sidebar.tsx` - Sidebar container and navigation components
+
+## Related Refs
+
+- [ref-theming](../refs/ref-theming.md) - CSS theming system
+
 ## Notes
 
 - Supports keyboard navigation

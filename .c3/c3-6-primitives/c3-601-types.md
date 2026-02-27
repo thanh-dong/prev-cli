@@ -86,6 +86,10 @@ interface SlotProps {
 - **Internal:** None
 - **External:** None
 
+## References
+
+- `src/primitives/types.ts` - Type definitions for layout primitives and their properties
+
 ## Notes
 
 - Props use CSS-like naming conventions

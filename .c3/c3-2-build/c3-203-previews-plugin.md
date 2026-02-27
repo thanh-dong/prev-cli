@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Vite plugin that discovers preview components, generates virtual modules for the preview catalog, and builds standalone preview HTML files for production.
+Content scanner that discovers preview components and generates virtual modules for the preview catalog. Virtual modules are served via the Bun plugin in `src/server/plugins/virtual-modules.ts`. Production preview HTML files are built by [c3-210](./c3-210-build.md).
 
 ## Location
 
-`src/vite/plugins/previews-plugin.ts`, `src/vite/previews.ts`
+`src/server/plugins/virtual-modules.ts` (virtual module generation), `src/content/previews.ts` (preview scanning and config building)
 
 ## Responsibilities
 
@@ -42,13 +42,13 @@ export function getByStatus(status: string): PreviewUnit[]
 
 ## Production Build
 
-During `closeBundle`:
+Handled by [c3-210-build](./c3-210-build.md):
 
 1. Build shared vendor bundle (`_vendors/runtime.js`)
 2. For each preview:
    - Load preview config
-   - Build optimized HTML with esbuild
-   - Write to `dist/_preview/<name>/index.html`
+   - Build optimized HTML with Bun.build
+   - Write to `dist/_preview/<type>s/<name>/index.html`
 
 ## Dependencies
 
@@ -70,11 +70,22 @@ Generate virtual module
 (Build mode) Compile standalone HTML
 ```
 
-## HMR
+## Live Reload
 
-Invalidates when files in `previews/` change:
-- `.html`, `.tsx`, `.ts`, `.jsx`, `.js`
-- `.css`, `.yaml`, `.yml`, `.mdx`
+In dev mode, file watcher triggers full rebuild and SSE reload when preview files change (see [c3-209](./c3-209-dev-server.md)).
+
+## References
+
+- `src/content/previews.ts` - Preview type definitions and discovery
+- `src/content/previews.ts:scanPreviewUnits()` - Scans for preview units
+- `src/content/previews.ts:buildPreviewConfig()` - Builds config for a preview directory
+- `src/server/plugins/virtual-modules.ts` - Virtual module generation via Bun plugin API
+- `src/preview-runtime/build-optimized.ts` - Optimized Bun.build integration
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Preview type hierarchy and schemas
+- [ref-virtual-modules](../refs/ref-virtual-modules.md) - Bun virtual module pattern
 
 ## Notes
 

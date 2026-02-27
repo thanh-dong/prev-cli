@@ -1,8 +1,10 @@
 // src/preview-runtime/build.ts
 // Production build for previews - pre-bundles React/TSX at build time
 
-import { build } from 'esbuild'
 import type { PreviewConfig } from './types'
+import { mkdtempSync, writeFileSync, rmSync, existsSync, mkdirSync } from 'fs'
+import { join, dirname } from 'path'
+import { tmpdir } from 'os'
 
 export interface PreviewBuildResult {
   html: string
@@ -11,18 +13,10 @@ export interface PreviewBuildResult {
 
 /**
  * Build a preview into a standalone HTML file for production
- * Uses esbuild (native) to bundle at build time
+ * Uses Bun.build (native) to bundle at build time
  */
 export async function buildPreviewHtml(config: PreviewConfig): Promise<PreviewBuildResult> {
   try {
-    // Build virtual filesystem
-    const virtualFs: Record<string, { contents: string; loader: string }> = {}
-    for (const file of config.files) {
-      const ext = file.path.split('.').pop()?.toLowerCase()
-      const loader = ext === 'css' ? 'css' : ext === 'json' ? 'json' : ext || 'tsx'
-      virtualFs[file.path] = { contents: file.content, loader }
-    }
-
     // Find entry and check if it exports default
     const entryFile = config.files.find(f => f.path === config.entry)
     if (!entryFile) {
@@ -43,83 +37,82 @@ export async function buildPreviewHtml(config: PreviewConfig): Promise<PreviewBu
       import './${config.entry}'
     `
 
-    // Bundle with esbuild
-    const result = await build({
-      stdin: {
-        contents: entryCode,
-        loader: 'tsx',
-        resolveDir: '/',
-      },
-      bundle: true,
-      write: false,
-      format: 'esm',
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-      target: 'es2020',
-      minify: true,
-      plugins: [{
-        name: 'virtual-fs',
-        setup(build) {
-          // External: React from CDN
-          build.onResolve({ filter: /^react(-dom)?(\/.*)?$/ }, args => {
-            const parts = args.path.split('/')
-            const pkg = parts[0]
-            const subpath = parts.slice(1).join('/')
-            const url = subpath
-              ? `https://esm.sh/${pkg}@18/${subpath}`
-              : `https://esm.sh/${pkg}@18`
-            return { path: url, external: true }
-          })
+    // Write all files to temp directory
+    const tempDir = mkdtempSync(join(tmpdir(), 'prev-build-'))
+    const entryPath = join(tempDir, '__entry.tsx')
 
-          // Auto-resolve npm packages via esm.sh
-          build.onResolve({ filter: /^[^./]/ }, args => {
-            if (args.path.startsWith('https://')) return
-            return { path: `https://esm.sh/${args.path}`, external: true }
-          })
+    try {
+      writeFileSync(entryPath, entryCode)
 
-          // Resolve relative imports
-          build.onResolve({ filter: /^\./ }, args => {
-            let resolved = args.path.replace(/^\.\//, '')
-            if (!resolved.includes('.')) {
-              for (const ext of ['.tsx', '.ts', '.jsx', '.js', '.css']) {
-                if (virtualFs[resolved + ext]) {
-                  resolved = resolved + ext
-                  break
-                }
-              }
-            }
-            return { path: resolved, namespace: 'virtual' }
-          })
+      // Write virtual files to temp dir
+      for (const file of config.files) {
+        const targetPath = join(tempDir, file.path)
+        const dir = dirname(targetPath)
+        if (!existsSync(dir)) {
+          mkdirSync(dir, { recursive: true })
+        }
+        writeFileSync(targetPath, file.content)
+      }
 
-          // Load from virtual filesystem
-          build.onLoad({ filter: /.*/, namespace: 'virtual' }, args => {
-            const file = virtualFs[args.path]
-            if (file) {
-              // CSS: convert to JS that injects styles
-              if (file.loader === 'css') {
-                const css = file.contents.replace(/`/g, '\\`').replace(/\$/g, '\\$')
+      // Bundle with Bun.build
+      const result = await Bun.build({
+        entrypoints: [entryPath],
+        format: 'esm',
+        target: 'browser',
+        minify: true,
+        jsx: { runtime: 'automatic', importSource: 'react' },
+        define: {
+          'process.env.NODE_ENV': '"production"',
+        },
+        plugins: [{
+          name: 'preview-externals',
+          setup(build) {
+            // External: React from CDN
+            build.onResolve({ filter: /^react(-dom)?(\/.*)?$/ }, args => {
+              const parts = args.path.split('/')
+              const pkg = parts[0]
+              const subpath = parts.slice(1).join('/')
+              const url = subpath
+                ? `https://esm.sh/${pkg}@18/${subpath}`
+                : `https://esm.sh/${pkg}@18`
+              return { path: url, external: true }
+            })
+
+            // Auto-resolve npm packages via esm.sh
+            build.onResolve({ filter: /^[^./]/ }, args => {
+              if (args.path.startsWith('https://')) return undefined
+              return { path: `https://esm.sh/${args.path}`, external: true }
+            })
+
+            // CSS: convert to JS that injects styles
+            build.onLoad({ filter: /\.css$/ }, args => {
+              const content = Bun.file(args.path)
+              return content.text().then(css => {
+                const escaped = css.replace(/`/g, '\\`').replace(/\$/g, '\\$')
                 return {
                   contents: `
                     const style = document.createElement('style');
-                    style.textContent = \`${css}\`;
+                    style.textContent = \`${escaped}\`;
                     document.head.appendChild(style);
                   `,
                   loader: 'js',
                 }
-              }
-              return { contents: file.contents, loader: file.loader as any }
-            }
-            return { contents: '', loader: 'empty' }
-          })
-        },
-      }],
-    })
+              })
+            })
+          },
+        }],
+      })
 
-    const jsFile = result.outputFiles.find(f => f.path.endsWith('.js')) || result.outputFiles[0]
-    const jsCode = jsFile?.text || ''
+      if (!result.success) {
+        const errors = result.logs.filter(l => l.level === 'error').map(l => l.message).join('; ')
+        return { html: '', error: errors || 'Build failed' }
+      }
 
-    // Generate standalone HTML
-    const html = `<!DOCTYPE html>
+      const jsFile = result.outputs.find(f => f.path.endsWith('.js')) || result.outputs[0]
+      const jsCode = jsFile ? await jsFile.text() : ''
+
+      // Generate standalone HTML
+      const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -137,7 +130,10 @@ export async function buildPreviewHtml(config: PreviewConfig): Promise<PreviewBu
 </body>
 </html>`
 
-    return { html }
+      return { html }
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
   } catch (err) {
     return {
       html: '',

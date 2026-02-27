@@ -1,5 +1,5 @@
 // src/jsx/jsx-runtime.ts
-// JSX runtime for Vite's automatic JSX transform
+// JSX runtime for automatic JSX transform
 import {
   createVNode,
   normalizeChildren,

@@ -77,6 +77,10 @@ const html = renderToHtml(vnode)
 // </div>
 ```
 
+## References
+
+- `src/jsx/adapters/html.ts` - HTML string rendering from VNode trees
+
 ## Notes
 
 - Output is minified by default

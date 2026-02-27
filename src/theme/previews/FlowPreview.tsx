@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import type { PreviewUnit, FlowDefinition } from '../../vite/preview-types'
+import type { PreviewUnit, FlowDefinition } from '../../content/preview-types'
 
 interface FlowStep {
   id?: string
@@ -123,14 +123,14 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
 
   // Build iframe URL for current step's screen
   const basePath = typeof window !== 'undefined'
-    ? (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+    ? (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
     : ''
   // For static builds: default state is in root, other states are in subdirs
   const staticStatePath = step?.state ? `${step.state}/` : ''
   const iframeUrl = step
     ? (isStaticBuild
         ? `${basePath}/_preview/screens/${step.screen}/${staticStatePath}`
-        : `/_preview-runtime?preview=screens/${step.screen}${step.state ? `&state=${step.state}` : ''}`)
+        : `/_preview-runtime?src=screens/${step.screen}${step.state ? `&state=${step.state}` : ''}`)
     : ''
 
   return (

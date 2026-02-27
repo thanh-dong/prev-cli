@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Builds standalone preview HTML files for production using esbuild and Tailwind CSS compilation.
+Builds standalone preview HTML files for production using Bun.build() and Tailwind CSS compilation.
 
 ## Location
 
@@ -11,7 +11,7 @@ Builds standalone preview HTML files for production using esbuild and Tailwind C
 ## Responsibilities
 
 - Build shared vendor bundle (React, ReactDOM)
-- Compile individual preview bundles with esbuild
+- Compile individual preview bundles with Bun.build()
 - Process Tailwind CSS v4 for production
 - Generate standalone HTML files
 
@@ -64,9 +64,9 @@ async function compileTailwind(
 ```
 Preview files (tsx, css, etc.)
     ↓
-Create virtual filesystem
+Write files to temp directory
     ↓
-Bundle with esbuild (externalize React)
+Bundle with Bun.build (externalize React via vendor bundle)
     ↓
 Compile Tailwind CSS
     ↓
@@ -86,8 +86,8 @@ Loaded once, shared across all previews for smaller total size.
 
 ## Dependencies
 
-- **Internal:** [c3-203-previews-plugin](./c3-203-previews-plugin.md) invokes during build
-- **External:** `esbuild` for bundling, `tailwindcss` for CSS processing
+- **Internal:** [c3-210-build](./c3-210-build.md) invokes during production build
+- **External:** Bun.build for bundling, `tailwindcss` for CSS processing
 
 ## PreviewConfig Interface
 
@@ -104,6 +104,21 @@ interface PreviewFile {
   type: 'tsx' | 'ts' | 'jsx' | 'js' | 'css' | 'json'
 }
 ```
+
+## References
+
+- `src/preview-runtime/build-optimized.ts` - Main preview building logic
+- `src/preview-runtime/build-optimized.ts:buildOptimizedPreview()` - Builds standalone preview HTML
+- `src/preview-runtime/vendors.ts` - Vendor bundle building
+- `src/preview-runtime/vendors.ts:buildVendorBundle()` - Creates shared React/ReactDOM bundle
+- `src/preview-runtime/tailwind.ts` - Tailwind CSS compilation
+- `src/preview-runtime/tailwind.ts:compileTailwind()` - Compiles Tailwind v4 CSS
+- `src/preview-runtime/types.ts` - Type definitions (PreviewConfig, PreviewFile, etc.)
+- `src/preview-runtime/template.html` - HTML template for preview output
+
+## Related Refs
+
+- [ref-preview-types](../refs/ref-preview-types.md) - Preview type hierarchy and configuration interfaces
 
 ## Notes
 

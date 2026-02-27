@@ -68,6 +68,10 @@ function resetIdCounter(): void
 - **Internal:** None
 - **External:** None
 
+## References
+
+- `src/jsx/vnode.ts` - VNode creation, normalization, and equality utilities
+
 ## Notes
 
 - IDs are auto-generated using incrementing counter

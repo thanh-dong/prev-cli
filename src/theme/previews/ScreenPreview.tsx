@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import type { PreviewUnit } from '../../vite/preview-types'
+import type { PreviewUnit } from '../../content/preview-types'
 import type { PreviewConfig, PreviewMessage, BuildResult } from '../../preview-runtime/types'
 
 interface ScreenPreviewProps {
@@ -33,7 +33,7 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
 
   // Build iframe URL - use static path for production, runtime for dev
   const baseUrl = typeof window !== 'undefined'
-    ? (import.meta.env?.BASE_URL ?? '/').replace(/\/$/, '')
+    ? (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
     : ''
   // For static builds: default state is in root, other states are in subdirs
   const staticStatePath = activeState === 'index' ? '' : `${activeState}/`

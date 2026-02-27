@@ -606,16 +606,23 @@ body {
 
 /* Preview detail page - full available space */
 .preview-detail-page {
+  display: flex;
+  flex-direction: column;
   height: calc(100vh - 4rem);
   padding: 0;
   margin: -2rem; /* Negate parent padding */
   margin-bottom: 3rem; /* Space for toolbar */
-}
-
-.preview-detail-page > div {
-  height: 100%;
   border-radius: 0;
   overflow: hidden;
+}
+
+.preview-detail-page > .preview-state-selector {
+  flex-shrink: 0;
+}
+
+.preview-detail-page > div:last-child {
+  flex: 1;
+  min-height: 0;
 }
 
 @media (min-width: 769px) {
@@ -626,7 +633,7 @@ body {
     padding: 1rem;
   }
 
-  .preview-detail-page > div {
+  .preview-detail-page > div:last-child {
     border-radius: 12px;
     border: 1px solid var(--fd-border);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);

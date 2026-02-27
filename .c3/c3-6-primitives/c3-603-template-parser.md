@@ -62,6 +62,10 @@ interface ParseResult {
 - **Internal:** [c3-602-parser](./c3-602-parser.md) for single primitives
 - **Internal:** [c3-601-types](./c3-601-types.md) for types
 
+## References
+
+- `src/primitives/template-parser.ts` - Parses full template layouts with nested primitives from YAML-like structures
+
 ## Example
 
 ```typescript

@@ -1,19 +1,11 @@
 // src/utils/cache.test.ts
-import { test, expect, beforeEach, afterEach } from 'bun:test'
+import { test, expect } from 'bun:test'
 import { getCacheDir, cleanCache } from './cache'
-import { mkdir, rm, utimes } from 'fs/promises'
+import { mkdir, utimes } from 'fs/promises'
 import path from 'path'
-import os from 'os'
+import { useTempDirPerTest, writeFiles } from '../../test/utils'
 
-const testCacheRoot = path.join(os.tmpdir(), 'prev-test-cache')
-
-beforeEach(async () => {
-  await mkdir(testCacheRoot, { recursive: true })
-})
-
-afterEach(async () => {
-  await rm(testCacheRoot, { recursive: true, force: true })
-})
+const getTempDir = useTempDirPerTest('prev-cache-test-')
 
 test('getCacheDir returns consistent hash for same path and branch', async () => {
   const dir1 = await getCacheDir('/test/path', 'main')
@@ -34,6 +26,7 @@ test('getCacheDir returns different hash for different paths', async () => {
 })
 
 test('cleanCache removes directories older than maxAgeDays', async () => {
+  const testCacheRoot = getTempDir()
   const oldDir = path.join(testCacheRoot, 'old-cache')
   const newDir = path.join(testCacheRoot, 'new-cache')
 
