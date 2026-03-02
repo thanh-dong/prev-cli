@@ -719,7 +719,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
               opacity: currentStepIndex <= 0 ? 0.5 : 1,
             }}
           >
-            \u2190
+            {'\u2190'}
           </button>
           {currentStep && canLinearNext(currentStep) && (
             <button
@@ -737,7 +737,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
                 opacity: currentStepIndex >= steps.length - 1 ? 0.5 : 1,
               }}
             >
-              \u2192
+              {'\u2192'}
             </button>
           )}
           {hasRegions && (
