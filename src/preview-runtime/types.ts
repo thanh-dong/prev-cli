@@ -27,3 +27,7 @@ export type PreviewMessage =
   | { type: 'ready' }
   | { type: 'built'; result: BuildResult }
   | { type: 'error'; error: string }
+  // Region interactivity (flow previews)
+  | { type: 'region-click'; region: string }
+  | { type: 'highlight-regions'; regions: string[] }
+  | { type: 'region-rects'; rects: Array<{ name: string; x: number; y: number; width: number; height: number }> }
