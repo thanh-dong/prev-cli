@@ -548,7 +548,6 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
       display: 'flex',
       flexDirection: 'column',
       borderRadius: '16px',
-      overflow: 'clip',
       backgroundColor: 'var(--fd-card)',
       boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04)',
       flex: 1,
@@ -798,7 +797,6 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
           backgroundColor: 'var(--fd-card)',
           borderRadius: '8px',
           boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 20px -4px rgba(0, 0, 0, 0.3)',
-          overflow: 'clip',
           display: 'flex',
           flexDirection: 'column',
           flex: 1,
@@ -845,8 +843,6 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
                 border: 'none',
                 display: 'block',
                 backgroundColor: 'white',
-                position: 'relative',
-                zIndex: 0,
               }}
               title={`Flow: ${flow.name} - ${currentStep?.title || `Step ${currentStepIndex + 1}`}`}
             />
