@@ -1,6 +1,0 @@
-title: Button
-description: Demonstrates @prev/jsx primitive DSL (Box, Text, toReact) with primary, secondary, and ghost variants
-tags: [core, ui, interactive, form]
-status: stable
-category: inputs
-order: 1

@@ -1,7 +1,0 @@
-kind: component
-id: input
-title: Input
-description: Form text input with label, placeholder, and three states (default, error, disabled)
-status: stable
-schemaVersion: "2.0"
-tags: [component, form, input]

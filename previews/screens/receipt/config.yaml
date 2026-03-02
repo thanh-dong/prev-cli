@@ -1,0 +1,5 @@
+kind: screen
+title: Order Receipt
+description: Order confirmation with summary, delivery estimate, and continue shopping
+tags: [screen, commerce, receipt, confirmation]
+status: stable

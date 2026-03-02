@@ -1,0 +1,40 @@
+kind: flow
+title: Checkout Flow
+description: Customer completes purchase — cart review, payment, confirmation
+tags: [flow, checkout, purchase]
+status: stable
+order: 1
+
+steps:
+  - id: cart
+    title: Review Cart
+    screen: cart
+    regions:
+      proceed:
+        goto: payment
+
+  - id: payment
+    title: Enter Payment
+    screen: payment
+    regions:
+      pay:
+        outcomes:
+          approved:
+            goto: receipt
+            label: Payment approved
+          declined:
+            goto: payment-error
+            label: Card declined
+
+  - id: payment-error
+    title: Payment Failed
+    screen: payment
+    state: error
+    regions:
+      retry:
+        goto: payment
+
+  - id: receipt
+    title: Order Confirmed
+    screen: receipt
+    terminal: true

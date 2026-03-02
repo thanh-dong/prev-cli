@@ -1,7 +1,0 @@
-kind: component
-id: sidebar
-title: Sidebar
-description: Navigation sidebar with workspace switcher, nav links, and user profile — used across 5 screens
-status: stable
-schemaVersion: "2.0"
-tags: [component, navigation, layout]

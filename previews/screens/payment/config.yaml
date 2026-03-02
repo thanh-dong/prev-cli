@@ -1,0 +1,12 @@
+kind: screen
+title: Payment
+description: Card payment form with order summary, processing state, and error handling
+tags: [screen, commerce, payment, checkout]
+status: stable
+states:
+  default:
+    description: Card payment form with order summary and Pay Now button
+  processing:
+    description: Payment processing spinner overlay
+  error:
+    description: Card declined error with retry option

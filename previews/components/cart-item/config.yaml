@@ -1,0 +1,5 @@
+kind: component
+title: Cart Item
+description: Product row displaying image, name, quantity, and line price
+tags: [component, commerce, cart]
+status: stable

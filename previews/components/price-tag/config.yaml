@@ -1,0 +1,5 @@
+kind: component
+title: Price Tag
+description: Formatted currency display with optional strikethrough for discounts
+tags: [component, commerce, pricing]
+status: stable

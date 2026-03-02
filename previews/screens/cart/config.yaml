@@ -1,0 +1,10 @@
+kind: screen
+id: cart
+title: Shopping Cart
+description: Cart review with product list, quantity controls, and order summary
+status: stable
+schemaVersion: "2.0"
+tags: [screen, commerce, cart]
+states:
+  default: { description: "Cart with 3 items, subtotal, tax, and proceed button" }
+  empty: { description: "Empty cart with call-to-action to start shopping" }
