@@ -196,7 +196,6 @@ export async function buildOptimizedPreview(
         html, body {
           margin: 0;
           min-height: 100vh;
-          overflow: hidden;
         }
         body {
           display: flex;
