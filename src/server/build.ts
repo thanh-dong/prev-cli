@@ -9,6 +9,8 @@ import { scanPreviewUnits, buildPreviewConfig } from '../content/previews'
 import { buildVendorBundle, buildJsxBundle } from '../preview-runtime/vendors'
 import { buildOptimizedPreview } from '../preview-runtime/build-optimized'
 import { loadConfig } from '../config'
+import { verifyFlow } from '../content/flow-verifier'
+import type { FlowConfig } from '../content/preview-types'
 
 // Find CLI root
 function findCliRoot(): string {
@@ -121,6 +123,23 @@ async function buildPreviewHtmlFiles(rootDir: string, distDir: string) {
   const targetDir = path.join(distDir, '_preview')
   const vendorsDir = path.join(targetDir, '_vendors')
   const previewsDir = path.join(rootDir, 'previews')
+
+  // Verify flow configs before building
+  let hasFlowErrors = false
+  for (const unit of units) {
+    if (unit.type !== 'flow' || !unit.config) continue
+    const result = verifyFlow(unit.config as FlowConfig, rootDir)
+    for (const w of result.warnings) {
+      console.warn(`  ⚠ flows/${unit.name}: ${w}`)
+    }
+    for (const e of result.errors) {
+      console.error(`  ✗ flows/${unit.name}: ${e}`)
+      hasFlowErrors = true
+    }
+  }
+  if (hasFlowErrors) {
+    throw new Error('Flow verification failed — fix errors above before building')
+  }
 
   // Count total builds (skip config-only types)
   let totalBuilds = 0

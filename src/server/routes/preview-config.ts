@@ -2,7 +2,9 @@
 import path from 'path'
 import { existsSync } from 'fs'
 import { buildPreviewConfig } from '../../content/previews'
-import { parseFlowDefinition, parseAtlasDefinition } from '../../content/config-parser'
+import { parseFlowDefinition, parseFlowConfig, parseAtlasDefinition } from '../../content/config-parser'
+import { verifyFlow } from '../../content/flow-verifier'
+import type { FlowConfig } from '../../content/preview-types'
 
 export function createPreviewConfigHandler(rootDir: string) {
   return async (req: Request): Promise<Response | null> => {
@@ -26,6 +28,30 @@ export function createPreviewConfigHandler(rootDir: string) {
       if (existsSync(previewDir)) {
         try {
           if (type === 'flows') {
+            // Try new config.yaml format first
+            const newConfigYaml = path.join(previewDir, 'config.yaml')
+            const newConfigYml = path.join(previewDir, 'config.yml')
+            const newConfigPath = existsSync(newConfigYaml) ? newConfigYaml : newConfigYml
+
+            if (existsSync(newConfigPath)) {
+              const result = await parseFlowConfig(newConfigPath, {
+                injectId: true,
+                injectKind: true,
+                folderName: name,
+              })
+              if (result.data) {
+                // Run verification and include results
+                const verification = verifyFlow(result.data as FlowConfig, rootDir)
+                return Response.json({
+                  name: result.data.title || name,
+                  description: result.data.description,
+                  steps: result.data.steps || [],
+                  _verification: verification,
+                })
+              }
+            }
+
+            // Fall back to legacy index.yaml
             const configPathYaml = path.join(previewDir, 'index.yaml')
             const configPathYml = path.join(previewDir, 'index.yml')
             const configPath = existsSync(configPathYaml) ? configPathYaml : configPathYml

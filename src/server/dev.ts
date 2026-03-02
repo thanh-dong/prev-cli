@@ -212,6 +212,14 @@ export async function startDevServer(options: DevServerOptions) {
       const tokensResponse = await tokensHandler(req)
       if (tokensResponse) return tokensResponse
 
+      // Region bridge script for flow interactivity
+      if (pathname === '/_prev/region-bridge.js') {
+        const { REGION_BRIDGE_SCRIPT } = await import('../preview-runtime/region-bridge')
+        return new Response(REGION_BRIDGE_SCRIPT, {
+          headers: { 'Content-Type': 'application/javascript' },
+        })
+      }
+
       // Preview runtime template
       if (pathname === '/_preview-runtime') {
         if (existsSync(previewRuntimePath)) {

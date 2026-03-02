@@ -54,6 +54,26 @@ export const screenConfigSchema = baseConfigSchema.extend({
   layoutByRenderer: z.record(z.string(), z.array(z.unknown())).optional(),
 })
 
+// Region schemas for interactive flows
+const regionGotoSchema = z.object({
+  goto: z.string(),
+})
+
+const regionOutcomesSchema = z.object({
+  outcomes: z.record(
+    z.string(),
+    z.object({
+      goto: z.string(),
+      label: z.string().optional(),
+    })
+  ),
+})
+
+const regionSchema = z.union([regionGotoSchema, regionOutcomesSchema])
+
+// Region names: lowercase, digits, hyphens only
+const regionNamePattern = /^[a-z0-9-]+$/
+
 // Flow step schema - flexible to match various config formats
 const flowStepSchema = z.object({
   id: z.string().optional(),  // Optional - can be auto-generated
@@ -64,6 +84,13 @@ const flowStepSchema = z.object({
   note: z.string().optional(),
   trigger: z.string().optional(),
   highlight: z.array(z.string()).optional(),
+  regions: z.record(z.string(), regionSchema)
+    .refine(
+      (r) => Object.keys(r).every(k => regionNamePattern.test(k)),
+      { message: 'Region names must be lowercase alphanumeric with hyphens' }
+    )
+    .optional(),
+  terminal: z.boolean().optional(),
 })
 
 // Flow transition schema
@@ -115,6 +142,10 @@ export type ComponentConfig = z.infer<typeof componentConfigSchema>
 export type ScreenConfig = z.infer<typeof screenConfigSchema>
 export type FlowConfig = z.infer<typeof flowConfigSchema>
 export type AtlasConfig = z.infer<typeof atlasConfigSchema>
+export type RegionGoto = z.infer<typeof regionGotoSchema>
+export type RegionOutcomes = z.infer<typeof regionOutcomesSchema>
+export type Region = z.infer<typeof regionSchema>
+export type FlowStep = z.infer<typeof flowStepSchema>
 
 // Extended preview unit with type awareness
 export interface PreviewUnit {
@@ -132,7 +163,7 @@ export interface PreviewUnit {
 }
 
 // Legacy FlowStep for backwards compatibility with existing index.yaml format
-export interface FlowStep {
+export interface LegacyFlowStep {
   id?: string
   title?: string
   description?: string
@@ -147,7 +178,7 @@ export interface FlowStep {
 export interface FlowDefinition {
   name: string
   description?: string
-  steps: FlowStep[]
+  steps: LegacyFlowStep[]
 }
 
 // Atlas area definition (legacy format)
