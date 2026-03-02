@@ -551,6 +551,8 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
       overflow: 'hidden',
       backgroundColor: 'var(--fd-card)',
       boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+      flex: 1,
+      minHeight: 0,
     }}>
       {/* Verification warnings banner */}
       {(verificationErrors.length > 0 || verificationWarnings.length > 0) && (
@@ -788,14 +790,19 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
         display: 'flex',
         justifyContent: 'center',
         position: 'relative',
+        flex: 1,
+        minHeight: 0,
       }}>
         <div style={{
           width: '100%',
-          maxWidth: '900px',
           backgroundColor: 'var(--fd-card)',
           borderRadius: '8px',
           boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 20px -4px rgba(0, 0, 0, 0.3)',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
         }}>
           {/* Minimal browser chrome */}
           <div style={{
@@ -825,7 +832,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
             </div>
           </div>
 
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             <iframe
               ref={el => {
                 (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = el
@@ -834,7 +841,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
               src={iframeUrl}
               style={{
                 width: '100%',
-                height: '500px',
+                height: '100%',
                 border: 'none',
                 display: 'block',
                 backgroundColor: 'white',
