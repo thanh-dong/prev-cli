@@ -613,7 +613,7 @@ body {
   margin: -2rem; /* Negate parent padding */
   margin-bottom: 3rem; /* Space for toolbar */
   border-radius: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .preview-detail-page > .preview-state-selector {
