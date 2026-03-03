@@ -80,5 +80,22 @@ export const REGION_BRIDGE_SCRIPT = `
   }
   window.addEventListener('scroll', debouncedReport, true);
   window.addEventListener('resize', debouncedReport);
+
+  // Token override handler: parent sends CSS overrides to inject
+  window.addEventListener('message', function(e) {
+    if (!e.data || e.data.type !== 'token-overrides') return;
+    var styleId = 'prev-token-overrides';
+    var existing = document.getElementById(styleId);
+    if (e.data.css) {
+      if (!existing) {
+        existing = document.createElement('style');
+        existing.id = styleId;
+        document.head.appendChild(existing);
+      }
+      existing.textContent = e.data.css;
+    } else if (existing) {
+      existing.remove();
+    }
+  });
 })();
 `

@@ -24,6 +24,9 @@ import { Layout } from './Layout'
 import { MetadataBlock } from './MetadataBlock'
 import { mdxComponents } from './mdx-components'
 import { DevToolsProvider } from './DevToolsContext'
+import { StatusBadge } from './previews/StatusBadge'
+import { useApprovalStatus } from './hooks/useApprovalStatus'
+import { SnapshotCompare } from './previews/SnapshotCompare'
 import './styles.css'
 
 // PageTree types (simplified from fumadocs-core)
@@ -251,6 +254,7 @@ function PreviewsCatalog() {
 import type { PreviewConfig, PreviewMessage } from '../preview-runtime/types'
 
 function PreviewCard({ name, title, status, type }: { name: string; title?: string; status?: 'draft' | 'stable' | 'deprecated'; type?: PreviewType }) {
+  const { status: approvalStatus } = useApprovalStatus(name)
   // Config-only types (flow) have no JS entry point — show a styled placeholder instead of iframe
   const isConfigOnly = type === 'flow'
 
@@ -360,6 +364,7 @@ function PreviewCard({ name, title, status, type }: { name: string; title?: stri
       <div className="preview-card-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <h3 className="preview-card-title">{title || name}</h3>
+          <StatusBadge status={approvalStatus} compact />
           {status && status !== 'stable' && (
             <span style={{
               fontSize: '10px',
@@ -440,9 +445,16 @@ function PreviewEmbed() {
 
 function PreviewPage() {
   const params = useParams({ strict: false })
+  const location = useLocation()
   // Splat param captures the full path after /previews/
   const name = (params as any)['_splat'] || (params as any)['*'] || params.name as string
-  const [selectedState, setSelectedState] = React.useState<string | null>(null)
+
+  // Read deep link params from URL search
+  const searchParams = new URLSearchParams(location.search)
+  const urlState = searchParams.get('state')
+  const urlStep = searchParams.get('step')
+
+  const [selectedState, setSelectedState] = React.useState<string | null>(urlState)
 
   if (!name) {
     return <Navigate to="/previews" />
@@ -458,7 +470,7 @@ function PreviewPage() {
   if (unit?.type === 'flow') {
     return (
       <div className="preview-detail-page">
-        <FlowPreview unit={unit} />
+        <FlowPreview unit={unit} initialStep={urlStep || undefined} />
       </div>
     )
   }
@@ -602,9 +614,22 @@ function NotFoundPage() {
 }
 
 // Create router with notFoundRoute
+// Snapshot compare route
+function ComparePageComponent() {
+  const params = new URLSearchParams(window.location.search)
+  return <SnapshotCompare leftId={params.get('left') || undefined} rightId={params.get('right') || undefined} />
+}
+
+const compareRoute = createRoute({
+  getParentRoute: () => previewsLayoutRoute,
+  path: '_compare',
+  component: ComparePageComponent,
+})
+
 // Previews routes: layout with catalog (index) and detail (splat) children
 const previewsRouteWithChildren = previewsLayoutRoute.addChildren([
   previewsCatalogRoute,
+  compareRoute,
   previewDetailRoute,
 ])
 

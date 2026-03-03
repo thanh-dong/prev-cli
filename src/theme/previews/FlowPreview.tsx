@@ -2,9 +2,23 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import type { PreviewUnit, FlowDefinition, FlowConfig, FlowStep } from '../../content/preview-types'
 import { resolveRegionClick, navigateBack, canLinearNext } from './flow-navigation'
 import { REGION_BRIDGE_SCRIPT } from '../../preview-runtime/region-bridge'
+import { useViewport, VIEWPORT_WIDTHS } from '../hooks/useViewport'
+import { ViewportControls } from './ViewportControls'
+import { useApprovalStatus } from '../hooks/useApprovalStatus'
+import { StatusDropdown } from './StatusDropdown'
+import { AnnotationLayer } from './AnnotationLayer'
+import { SnapshotButton } from './SnapshotButton'
+import { SnapshotPanel } from './SnapshotPanel'
+import { useSnapshots } from '../hooks/useSnapshots'
+import { useTokenOverrides } from '../hooks/useTokenOverrides'
+import { TokenPlayground } from './TokenPlayground'
+import { FlowDiagram } from './FlowDiagram'
+import { Icon } from '../icons'
+import { tokens as designTokens } from 'virtual:prev-tokens'
 
 interface FlowPreviewProps {
   unit: PreviewUnit
+  initialStep?: string
 }
 
 interface FlowData {
@@ -19,7 +33,7 @@ const isStaticBuild = typeof window !== 'undefined' &&
   !window.location.hostname.includes('localhost') &&
   !window.location.hostname.includes('127.0.0.1')
 
-export function FlowPreview({ unit }: FlowPreviewProps) {
+export function FlowPreview({ unit, initialStep }: FlowPreviewProps) {
   const [flow, setFlow] = useState<FlowData | null>(null)
   const [currentStepId, setCurrentStepId] = useState<string | null>(null)
   const [history, setHistory] = useState<string[]>([])
@@ -30,6 +44,14 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
   } | null>(null)
   const [regionRects, setRegionRects] = useState<Array<{ name: string; x: number; y: number; width: number; height: number }>>([])
   const [showOverlay, setShowOverlay] = useState(true)
+  const [viewport, setViewport] = useViewport()
+  const { status: approvalStatus, changeStatus, getAuditLog } = useApprovalStatus(`flows/${unit.name}`)
+  const [annotationsEnabled, setAnnotationsEnabled] = useState(false)
+  const [showSnapshots, setShowSnapshots] = useState(false)
+  const [showTokens, setShowTokens] = useState(false)
+  const [showFlowMap, setShowFlowMap] = useState(false)
+  const { snapshots, captureSnapshot, deleteSnapshot } = useSnapshots(`flows/${unit.name}`)
+  const { overrides: tokenOverrides, setOverride, removeOverride, resetAll, toCssOverrides } = useTokenOverrides()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const fullscreenIframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -43,9 +65,11 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
         steps: config.steps,
       }
       setFlow(data)
-      const firstId = config.steps[0].id || 'step-0'
-      setCurrentStepId(firstId)
-      setHistory([firstId])
+      const targetId = initialStep && config.steps.some(s => s.id === initialStep)
+        ? initialStep
+        : config.steps[0].id || 'step-0'
+      setCurrentStepId(targetId)
+      setHistory([targetId])
       setLoading(false)
       return
     }
@@ -63,9 +87,11 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
         }
         setFlow(flowData)
         if (steps.length > 0) {
-          const firstId = steps[0].id || 'step-0'
-          setCurrentStepId(firstId)
-          setHistory([firstId])
+          const targetId = initialStep && steps.some(s => s.id === initialStep)
+            ? initialStep
+            : steps[0].id || 'step-0'
+          setCurrentStepId(targetId)
+          setHistory([targetId])
         }
         setLoading(false)
       })
@@ -195,6 +221,14 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
       handleBack()
     }
   }
+
+  // Send token overrides to iframe
+  useEffect(() => {
+    const iframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current
+    if (!iframe?.contentWindow) return
+    const css = toCssOverrides()
+    iframe.contentWindow.postMessage({ type: 'token-overrides', css }, '*')
+  }, [tokenOverrides, isFullscreen, currentStepId])
 
   // Build iframe URL
   const screenName = currentStep
@@ -650,6 +684,13 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
           </div>
         </div>
 
+        <StatusDropdown
+          previewName={`flows/${unit.name}`}
+          status={approvalStatus}
+          onStatusChange={changeStatus}
+          getAuditLog={getAuditLog}
+        />
+
         {/* Center: Progress dots */}
         <div style={{
           display: 'flex',
@@ -702,8 +743,100 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
           })}
         </div>
 
-        {/* Right: Navigation + fullscreen */}
-        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+        {/* Right: Annotations + Snapshots + Tokens + FlowMap + Viewport + Navigation + fullscreen */}
+        <div style={{ display: 'flex', gap: '4px', flexShrink: 0, alignItems: 'center' }}>
+          <button
+            onClick={() => setAnnotationsEnabled(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '5px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              backgroundColor: annotationsEnabled ? 'oklch(0.92 0.08 250)' : 'var(--fd-background)',
+              color: annotationsEnabled ? 'oklch(0.45 0.18 250)' : 'var(--fd-muted-foreground)',
+            }}
+            title={annotationsEnabled ? 'Disable annotations' : 'Enable annotations'}
+          >
+            <Icon name="pin" size={13} />
+          </button>
+          <SnapshotButton onCapture={() => captureSnapshot(iframeRef, {
+            previewName: `flows/${unit.name}`,
+            stateOrStep: currentStepId || 'step-0',
+            viewport,
+          })} />
+          <button
+            onClick={() => setShowSnapshots(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '5px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              backgroundColor: 'var(--fd-background)',
+              color: 'var(--fd-muted-foreground)',
+              position: 'relative',
+            }}
+            title="View snapshots"
+          >
+            <Icon name="camera" size={13} />
+            {snapshots.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--fd-primary)',
+                color: 'var(--fd-primary-foreground)',
+                fontSize: '8px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>{snapshots.length}</span>
+            )}
+          </button>
+          <button
+            onClick={() => setShowTokens(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '5px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              backgroundColor: showTokens ? 'oklch(0.92 0.08 310)' : 'var(--fd-background)',
+              color: showTokens ? 'oklch(0.45 0.18 310)' : 'var(--fd-muted-foreground)',
+            }}
+            title="Token playground"
+          >
+            <Icon name="palette" size={13} />
+          </button>
+          <button
+            onClick={() => setShowFlowMap(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '5px',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              backgroundColor: showFlowMap ? 'oklch(0.92 0.08 170)' : 'var(--fd-background)',
+              color: showFlowMap ? 'oklch(0.40 0.15 170)' : 'var(--fd-muted-foreground)',
+            }}
+            title="Flow map"
+          >
+            <Icon name="map" size={13} />
+          </button>
+          <ViewportControls viewport={viewport} onViewportChange={setViewport} />
           <button
             onClick={handleLinearPrev}
             disabled={currentStepIndex <= 0}
@@ -793,7 +926,8 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
         minHeight: 0,
       }}>
         <div style={{
-          width: '100%',
+          width: viewport === 'desktop' ? '100%' : VIEWPORT_WIDTHS[viewport],
+          maxWidth: '100%',
           backgroundColor: 'var(--fd-card)',
           borderRadius: '8px',
           boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.1), 0 4px 20px -4px rgba(0, 0, 0, 0.3)',
@@ -801,6 +935,7 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
           flexDirection: 'column',
           flex: 1,
           minHeight: 0,
+          transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
           {/* Minimal browser chrome */}
           <div style={{
@@ -830,29 +965,70 @@ export function FlowPreview({ unit }: FlowPreviewProps) {
             </div>
           </div>
 
-          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-            <iframe
-              ref={el => {
-                (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = el
-                injectBridge(el)
-              }}
-              src={iframeUrl}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                display: 'block',
-                backgroundColor: 'white',
-              }}
-              title={`Flow: ${flow.name} - ${currentStep?.title || `Step ${currentStepIndex + 1}`}`}
-            />
-            {RegionOverlay}
-          </div>
+          <AnnotationLayer
+            previewName={`flows/${unit.name}`}
+            stateOrStep={currentStepId || 'step-0'}
+            enabled={annotationsEnabled}
+          >
+            <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+              <iframe
+                ref={el => {
+                  (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = el
+                  injectBridge(el)
+                }}
+                src={iframeUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  display: 'block',
+                  backgroundColor: 'white',
+                }}
+                title={`Flow: ${flow.name} - ${currentStep?.title || `Step ${currentStepIndex + 1}`}`}
+              />
+              {RegionOverlay}
+            </div>
+          </AnnotationLayer>
         </div>
 
         {/* Outcome picker floating panel */}
         {OutcomePicker}
       </div>
+
+      {/* Flow diagram panel */}
+      {showFlowMap && (
+        <div style={{
+          padding: '16px',
+          borderTop: '1px solid var(--fd-border)',
+          backgroundColor: 'var(--fd-card)',
+        }}>
+          <FlowDiagram
+            steps={steps}
+            currentStepId={currentStepId}
+            visitedStepIds={history}
+            onStepClick={goToStep}
+          />
+        </div>
+      )}
+
+      {/* Panels */}
+      {showSnapshots && (
+        <SnapshotPanel
+          snapshots={snapshots}
+          onDelete={deleteSnapshot}
+          onClose={() => setShowSnapshots(false)}
+        />
+      )}
+      {showTokens && (
+        <TokenPlayground
+          tokens={designTokens}
+          overrides={tokenOverrides}
+          onSetOverride={setOverride}
+          onRemoveOverride={removeOverride}
+          onResetAll={resetAll}
+          onClose={() => setShowTokens(false)}
+        />
+      )}
     </div>
   )
 }

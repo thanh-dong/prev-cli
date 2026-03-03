@@ -13,6 +13,7 @@ import { createPreviewConfigHandler } from './routes/preview-config'
 import { createJsxBundleHandler } from './routes/jsx-bundle'
 import { createComponentBundleHandler } from './routes/component-bundle'
 import { createTokensHandler } from './routes/tokens'
+import { handleOgImageRequest } from './routes/og-image'
 import { loadConfig, updateOrder } from '../config'
 import type { PrevConfig } from '../config'
 
@@ -212,6 +213,10 @@ export async function startDevServer(options: DevServerOptions) {
       const tokensResponse = await tokensHandler(req)
       if (tokensResponse) return tokensResponse
 
+      // OG image endpoint
+      const ogResponse = handleOgImageRequest(req, [])
+      if (ogResponse) return ogResponse
+
       // Region bridge script for flow interactivity
       if (pathname === '/_prev/region-bridge.js') {
         const { REGION_BRIDGE_SCRIPT } = await import('../preview-runtime/region-bridge')
@@ -248,6 +253,32 @@ export async function startDevServer(options: DevServerOptions) {
           !pathname.startsWith('/__') &&
           !pathname.startsWith('/_preview') &&
           !pathname.startsWith('/_prev')) {
+        // Inject OG meta tags for preview routes (deep links)
+        if (pathname.startsWith('/previews/') && pathname !== '/previews') {
+          const previewPath = pathname.slice('/previews/'.length)
+          const searchParams = new URL(req.url).searchParams
+          const ogState = searchParams.get('state')
+          const ogStep = searchParams.get('step')
+          const ogTitle = previewPath.split('/').pop() || 'Preview'
+          const ogParams = [
+            ogState ? `state=${ogState}` : '',
+            ogStep ? `step=${ogStep}` : '',
+          ].filter(Boolean).join('&')
+          const ogImageUrl = `/_og/${previewPath}${ogParams ? `?${ogParams}` : ''}`
+
+          const ogHtml = HTML_SHELL.replace(
+            '<title>Documentation</title>',
+            `<title>${ogTitle} - Preview</title>
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogState ? `State: ${ogState}` : ogStep ? `Step: ${ogStep}` : 'Preview'}" />
+  <meta property="og:image" content="${ogImageUrl}" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />`
+          )
+          return new Response(ogHtml, {
+            headers: { 'Content-Type': 'text/html' },
+          })
+        }
         return new Response(HTML_SHELL, {
           headers: { 'Content-Type': 'text/html' },
         })

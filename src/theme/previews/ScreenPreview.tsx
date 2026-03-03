@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react'
 import type { PreviewUnit } from '../../content/preview-types'
 import type { PreviewConfig, PreviewMessage, BuildResult } from '../../preview-runtime/types'
+import { useViewport, VIEWPORT_WIDTHS } from '../hooks/useViewport'
+import { ViewportControls } from './ViewportControls'
+import { useApprovalStatus } from '../hooks/useApprovalStatus'
+import { StatusDropdown } from './StatusDropdown'
+import { AnnotationLayer } from './AnnotationLayer'
+import { SnapshotButton } from './SnapshotButton'
+import { SnapshotPanel } from './SnapshotPanel'
+import { useSnapshots } from '../hooks/useSnapshots'
+import { useTokenOverrides } from '../hooks/useTokenOverrides'
+import { TokenPlayground } from './TokenPlayground'
+import { Icon } from '../icons'
+import { tokens as designTokens } from 'virtual:prev-tokens'
 
 interface ScreenPreviewProps {
   unit: PreviewUnit
   initialState?: string
-}
-
-type Viewport = 'mobile' | 'tablet' | 'desktop'
-
-const viewports: Record<Viewport, { width: number; label: string; icon: string }> = {
-  mobile: { width: 375, label: 'Mobile', icon: '📱' },
-  tablet: { width: 768, label: 'Tablet', icon: '📱' },
-  desktop: { width: 1280, label: 'Desktop', icon: '🖥' },
 }
 
 // Detect if running in static build (no dev server)
@@ -23,11 +27,17 @@ const isStaticBuild = typeof window !== 'undefined' &&
 export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
   const states = ['index', ...(unit.files.states || []).map(s => s.replace(/\.(tsx|jsx)$/, ''))]
   const [activeState, setActiveState] = useState(initialState || 'index')
-  const [viewport, setViewport] = useState<Viewport>('desktop')
+  const [viewport, setViewport] = useViewport()
+  const { status: approvalStatus, changeStatus, getAuditLog } = useApprovalStatus(`screens/${unit.name}`)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [buildStatus, setBuildStatus] = useState<'loading' | 'building' | 'ready' | 'error'>('loading')
   const [buildError, setBuildError] = useState<string | null>(null)
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [annotationsEnabled, setAnnotationsEnabled] = useState(false)
+  const [showSnapshots, setShowSnapshots] = useState(false)
+  const [showTokens, setShowTokens] = useState(false)
+  const { snapshots, captureSnapshot, deleteSnapshot } = useSnapshots(`screens/${unit.name}`)
+  const { overrides: tokenOverrides, setOverride, removeOverride, resetAll, toCssOverrides } = useTokenOverrides()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const fullscreenIframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -105,6 +115,14 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [unit.name, activeState, isFullscreen])
+
+  // Send token overrides to iframe
+  useEffect(() => {
+    const iframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current
+    if (!iframe?.contentWindow) return
+    const css = toCssOverrides()
+    iframe.contentWindow.postMessage({ type: 'token-overrides', css }, '*')
+  }, [tokenOverrides, isFullscreen, buildStatus])
 
   // Fullscreen mode
   if (isFullscreen) {
@@ -254,6 +272,92 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
             </div>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={() => setAnnotationsEnabled(prev => !prev)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                backgroundColor: annotationsEnabled ? 'oklch(0.92 0.08 250)' : 'var(--fd-muted)',
+                color: annotationsEnabled ? 'oklch(0.45 0.18 250)' : 'var(--fd-muted-foreground)',
+                transition: 'all 0.15s ease',
+              }}
+              title={annotationsEnabled ? 'Disable annotations' : 'Enable annotations'}
+            >
+              <Icon name="pin" size={14} />
+            </button>
+            <SnapshotButton onCapture={() => captureSnapshot(iframeRef, {
+              previewName: `screens/${unit.name}`,
+              stateOrStep: activeState,
+              viewport,
+            })} />
+            <button
+              onClick={() => setShowSnapshots(prev => !prev)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                backgroundColor: 'var(--fd-muted)',
+                color: 'var(--fd-muted-foreground)',
+                transition: 'all 0.15s ease',
+                position: 'relative',
+              }}
+              title="View snapshots"
+            >
+              <Icon name="camera" size={14} />
+              {snapshots.length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--fd-primary)',
+                  color: 'var(--fd-primary-foreground)',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>{snapshots.length}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowTokens(prev => !prev)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '6px',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                backgroundColor: showTokens ? 'oklch(0.92 0.08 310)' : 'var(--fd-muted)',
+                color: showTokens ? 'oklch(0.45 0.18 310)' : 'var(--fd-muted-foreground)',
+                transition: 'all 0.15s ease',
+              }}
+              title="Token playground"
+            >
+              <Icon name="palette" size={14} />
+            </button>
+            <StatusDropdown
+              previewName={`screens/${unit.name}`}
+              status={approvalStatus}
+              onStatusChange={changeStatus}
+              getAuditLog={getAuditLog}
+            />
+          </div>
+
           {/* State tabs */}
           {states.length > 1 && (
             <div style={{
@@ -342,7 +446,7 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
         {/* Browser frame */}
         <div
           style={{
-            width: viewport === 'desktop' ? '100%' : viewports[viewport].width,
+            width: viewport === 'desktop' ? '100%' : VIEWPORT_WIDTHS[viewport],
             maxWidth: '100%',
             backgroundColor: 'var(--fd-card)',
             borderRadius: '12px',
@@ -416,42 +520,48 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
           </div>
 
           {/* Screen content */}
-          <div style={{ position: 'relative' }}>
-            {buildStatus === 'loading' && (
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: 'var(--fd-background)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 5,
-              }}>
+          <AnnotationLayer
+            previewName={`screens/${unit.name}`}
+            stateOrStep={activeState}
+            enabled={annotationsEnabled}
+          >
+            <div style={{ position: 'relative' }}>
+              {buildStatus === 'loading' && (
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  border: '2px solid var(--fd-border)',
-                  borderTopColor: 'var(--fd-primary)',
-                  borderRadius: '50%',
-                  animation: 'spin 0.8s linear infinite',
-                }} />
-              </div>
-            )}
-            <iframe
-              ref={iframeRef}
-              src={iframeUrl}
-              style={{
-                width: '100%',
-                height: '500px',
-                border: 'none',
-                display: 'block',
-                backgroundColor: 'white',
-                opacity: (isStaticBuild ? iframeLoaded : buildStatus === 'ready') ? 1 : 0.5,
-                transition: 'opacity 0.3s ease',
-              }}
-              title={`Screen: ${unit.name} - ${activeState}`}
-            />
-          </div>
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'var(--fd-background)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 5,
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    border: '2px solid var(--fd-border)',
+                    borderTopColor: 'var(--fd-primary)',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                  }} />
+                </div>
+              )}
+              <iframe
+                ref={iframeRef}
+                src={iframeUrl}
+                style={{
+                  width: '100%',
+                  height: '500px',
+                  border: 'none',
+                  display: 'block',
+                  backgroundColor: 'white',
+                  opacity: (isStaticBuild ? iframeLoaded : buildStatus === 'ready') ? 1 : 0.5,
+                  transition: 'opacity 0.3s ease',
+                }}
+                title={`Screen: ${unit.name} - ${activeState}`}
+              />
+            </div>
+          </AnnotationLayer>
         </div>
       </div>
 
@@ -460,52 +570,11 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '4px',
         padding: '16px',
         borderTop: '1px solid var(--fd-border)',
         backgroundColor: 'var(--fd-card)',
       }}>
-        {(Object.entries(viewports) as [Viewport, typeof viewports[Viewport]][]).map(([key, { width, label }]) => (
-          <button
-            key={key}
-            onClick={() => setViewport(key)}
-            style={{
-              padding: '8px 16px',
-              fontSize: '12px',
-              fontWeight: 500,
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              backgroundColor: viewport === key ? 'var(--fd-primary)' : 'var(--fd-muted)',
-              color: viewport === key ? 'var(--fd-primary-foreground)' : 'var(--fd-muted-foreground)',
-              transition: 'all 0.15s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-            onMouseEnter={(e) => {
-              if (viewport !== key) {
-                e.currentTarget.style.backgroundColor = 'var(--fd-secondary)'
-                e.currentTarget.style.color = 'var(--fd-foreground)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (viewport !== key) {
-                e.currentTarget.style.backgroundColor = 'var(--fd-muted)'
-                e.currentTarget.style.color = 'var(--fd-muted-foreground)'
-              }
-            }}
-            title={`${label} (${width}px)`}
-          >
-            {label}
-            <span style={{
-              fontSize: '10px',
-              opacity: 0.7,
-            }}>
-              {width}px
-            </span>
-          </button>
-        ))}
+        <ViewportControls viewport={viewport} onViewportChange={setViewport} />
       </div>
 
       {/* Tags */}
@@ -535,6 +604,25 @@ export function ScreenPreview({ unit, initialState }: ScreenPreviewProps) {
             </span>
           ))}
         </div>
+      )}
+
+      {/* Panels */}
+      {showSnapshots && (
+        <SnapshotPanel
+          snapshots={snapshots}
+          onDelete={deleteSnapshot}
+          onClose={() => setShowSnapshots(false)}
+        />
+      )}
+      {showTokens && (
+        <TokenPlayground
+          tokens={designTokens}
+          overrides={tokenOverrides}
+          onSetOverride={setOverride}
+          onRemoveOverride={removeOverride}
+          onResetAll={resetAll}
+          onClose={() => setShowTokens(false)}
+        />
       )}
 
       {/* Inline styles for animations */}

@@ -92,13 +92,51 @@ export function IconSprite() {
       <symbol id="icon-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M19 12H5M12 19l-7-7 7-7" />
       </symbol>
+
+      {/* Pin (map pin) */}
+      <symbol id="icon-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+        <circle cx="12" cy="9" r="2.5" />
+      </symbol>
+
+      {/* Camera */}
+      <symbol id="icon-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="13" r="4" />
+      </symbol>
+
+      {/* Check Circle */}
+      <symbol id="icon-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <path d="M22 4L12 14.01l-3-3" />
+      </symbol>
+
+      {/* Palette */}
+      <symbol id="icon-palette" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
+        <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
+        <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
+        <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
+        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.04-.23-.29-.38-.63-.38-1.02 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.17-4.49-8.94-10-8.94z" />
+      </symbol>
+
+      {/* Map / Flow diagram */}
+      <symbol id="icon-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z" />
+        <path d="M8 2v16M16 6v16" />
+      </symbol>
+
+      {/* Message Circle */}
+      <symbol id="icon-message-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+      </symbol>
     </svg>
   )
 }
 
 // Icon component that references symbols from the sprite
 interface IconProps {
-  name: 'menu' | 'grid' | 'sun' | 'moon' | 'maximize' | 'minimize' | 'x' | 'chevron-right' | 'file' | 'folder' | 'mobile' | 'tablet' | 'desktop' | 'sliders' | 'loader' | 'arrow-left'
+  name: 'menu' | 'grid' | 'sun' | 'moon' | 'maximize' | 'minimize' | 'x' | 'chevron-right' | 'file' | 'folder' | 'mobile' | 'tablet' | 'desktop' | 'sliders' | 'loader' | 'arrow-left' | 'pin' | 'camera' | 'check-circle' | 'palette' | 'map' | 'message-circle'
   size?: number
   className?: string
   style?: React.CSSProperties

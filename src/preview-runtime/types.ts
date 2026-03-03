@@ -31,3 +31,5 @@ export type PreviewMessage =
   | { type: 'region-click'; region: string }
   | { type: 'highlight-regions'; regions: string[] }
   | { type: 'region-rects'; rects: Array<{ name: string; x: number; y: number; width: number; height: number }> }
+  // Token override injection
+  | { type: 'token-overrides'; css: string }
