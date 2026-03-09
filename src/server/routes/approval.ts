@@ -79,6 +79,66 @@ export function readCRContext(rootDir: string): CRContext | null {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+// ── CR Context ───────────────────────────────────────────────────────────────
+
+export interface CRContext {
+  cr_id: string
+  slug: string
+  branch: string
+  pr_number?: number
+  pr_url?: string
+  tunnel_url?: string
+  user?: string
+  created_at?: string
+}
+
+function getCRContext(rootDir: string): CRContext | null {
+  // Try active-crs.json in rootDir — look for the CR matching current branch
+  const activeCRsPath = path.join(rootDir, 'active-crs.json')
+  if (!existsSync(activeCRsPath)) return null
+
+  try {
+    const crs: Record<string, CRContext & { status: string; prev_port?: number }> =
+      JSON.parse(readFileSync(activeCRsPath, 'utf-8'))
+
+    // Find CR that matches current git branch
+    const { execSync } = require('child_process') as typeof import('child_process')
+    let currentBranch = ''
+    try {
+      currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: rootDir }).toString().trim()
+    } catch {}
+
+    if (currentBranch) {
+      const match = Object.values(crs).find(cr => cr.branch === currentBranch)
+      if (match) return {
+        cr_id: match.cr_id,
+        slug: match.slug,
+        branch: match.branch,
+        pr_number: match.pr_number,
+        pr_url: match.pr_url,
+        tunnel_url: match.tunnel_url,
+        user: match.user,
+        created_at: match.created_at,
+      }
+    }
+
+    // Fallback: return first pending_review CR
+    const pending = Object.values(crs).find(cr => cr.status === 'pending_review')
+    if (pending) return {
+      cr_id: pending.cr_id,
+      slug: pending.slug,
+      branch: pending.branch,
+      pr_number: pending.pr_number,
+      pr_url: pending.pr_url,
+      tunnel_url: pending.tunnel_url,
+      user: pending.user,
+      created_at: pending.created_at,
+    }
+  } catch {}
+
+  return null
+}
+
 export function createApprovalHandler(rootDir: string, webhookUrl?: string) {
   return async (req: Request): Promise<Response | null> => {
     const url = new URL(req.url)
@@ -135,6 +195,12 @@ export function createApprovalHandler(rootDir: string, webhookUrl?: string) {
       }
 
       return Response.json({ success: true, entry })
+    }
+
+    // GET /__prev/cr-context — return CR context for current branch
+    if (url.pathname === '/__prev/cr-context' && req.method === 'GET') {
+      const context = getCRContext(rootDir)
+      return Response.json({ context })
     }
 
     return null // not handled
