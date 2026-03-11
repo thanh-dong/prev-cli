@@ -14,9 +14,12 @@ interface ToolbarProps {
   isFullWidth: boolean
   onTocToggle: () => void
   tocOpen: boolean
+  onCRToggle: () => void
+  crOpen: boolean
+  hasCRs: boolean
 }
 
-export function Toolbar({ tree, onThemeToggle, onWidthToggle, isDark, isFullWidth, onTocToggle, tocOpen }: ToolbarProps) {
+export function Toolbar({ tree, onThemeToggle, onWidthToggle, isDark, isFullWidth, onTocToggle, tocOpen, onCRToggle, crOpen, hasCRs }: ToolbarProps) {
   const [position, setPosition] = useState({ x: 20, y: typeof window !== 'undefined' ? window.innerHeight - 80 : 600 })
   const [dragging, setDragging] = useState(false)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
@@ -80,6 +83,17 @@ export function Toolbar({ tree, onThemeToggle, onWidthToggle, isDark, isFullWidt
         <Link to="/previews" className={`toolbar-btn ${isOnPreviews ? 'active' : ''}`} title="Previews">
           <Icon name="grid" size={18} />
         </Link>
+      )}
+
+      {hasCRs && (
+        <button
+          className={`toolbar-btn cr-toolbar-btn ${crOpen ? 'active' : ''}`}
+          onClick={onCRToggle}
+          title="Change Requests"
+          style={{ position: 'relative' }}
+        >
+          <Icon name="git-pr" size={18} />
+        </button>
       )}
 
       {/* Contextual devtools - rendered from preview context */}

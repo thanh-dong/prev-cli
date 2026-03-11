@@ -49,6 +49,25 @@ declare module 'virtual:prev-config' {
   export const config: PrevConfig
 }
 
+declare module 'virtual:prev-crs' {
+  export interface CRPage {
+    route: string
+    title: string
+    file: string
+    cr?: string
+    crStatus?: string
+  }
+
+  export interface CRGroup {
+    cr_id: string
+    slug?: string
+    status?: string
+    pages: CRPage[]
+  }
+
+  export const crGroups: CRGroup[]
+}
+
 declare module 'virtual:prev-tokens' {
   import type { TokensConfig } from '../tokens/resolver'
   export const tokens: TokensConfig

@@ -2,7 +2,7 @@
 // Uses onResolve/onLoad with namespace (works with both Bun.plugin() and Bun.build())
 import type { BunPlugin } from 'bun'
 import path from 'path'
-import { scanPages, buildSidebarTree } from '../../content/pages'
+import { scanPages, buildSidebarTree, buildCRGroups } from '../../content/pages'
 import { scanPreviewUnits } from '../../content/previews'
 import { loadConfig, type PrevConfig } from '../../config'
 import { resolveTokens } from '../../tokens/resolver'
@@ -82,6 +82,15 @@ export function getByTags(tags) { return previewUnits.filter(u => u.config?.tags
 export function getByCategory(category) { return previewUnits.filter(u => u.config?.category === category); }
 export function getByStatus(status) { return previewUnits.filter(u => u.config?.status === status); }
 `,
+              loader: 'js',
+            }
+          }
+
+          case 'virtual:prev-crs': {
+            const pages = await getPages()
+            const crGroups = buildCRGroups(pages)
+            return {
+              contents: `export const crGroups = ${JSON.stringify(crGroups)};`,
               loader: 'js',
             }
           }

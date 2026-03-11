@@ -4,12 +4,15 @@ import type { PageTree } from 'fumadocs-core/server'
 import { config } from 'virtual:prev-config'
 import { Toolbar } from './Toolbar'
 import { TOCPanel } from './TOCPanel'
+import { CRPanel } from './CRPanel'
 import { IconSprite } from './icons'
 import { StatusDropdown } from './previews/StatusDropdown'
 import { useApprovalStatus } from './hooks/useApprovalStatus'
 import { useCRContext } from './hooks/useCRContext'
+import { crGroups } from 'virtual:prev-crs'
 import './Toolbar.css'
 import './TOCPanel.css'
+import './CRPanel.css'
 
 interface LayoutProps {
   tree: PageTree.Root
@@ -99,6 +102,7 @@ function CRContextBanner() {
 
 export function Layout({ tree, children }: LayoutProps) {
   const [tocOpen, setTocOpen] = useState(false)
+  const [crOpen, setCrOpen] = useState(false)
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -121,7 +125,8 @@ export function Layout({ tree, children }: LayoutProps) {
 
   const handleThemeToggle = () => setIsDark(!isDark)
   const handleWidthToggle = () => setIsFullWidth(!isFullWidth)
-  const handleTocToggle = () => setTocOpen(!tocOpen)
+  const handleTocToggle = () => { setTocOpen(!tocOpen); setCrOpen(false) }
+  const handleCRToggle = () => { setCrOpen(!crOpen); setTocOpen(false) }
 
   return (
     <div className="prev-layout-floating">
@@ -134,6 +139,9 @@ export function Layout({ tree, children }: LayoutProps) {
         isFullWidth={isFullWidth}
         onTocToggle={handleTocToggle}
         tocOpen={tocOpen}
+        onCRToggle={handleCRToggle}
+        crOpen={crOpen}
+        hasCRs={crGroups.length > 0}
       />
       <PageApprovalBadge />
       <CRContextBanner />
@@ -142,6 +150,9 @@ export function Layout({ tree, children }: LayoutProps) {
           tree={tree}
           onClose={() => setTocOpen(false)}
         />
+      )}
+      {crOpen && (
+        <CRPanel onClose={() => setCrOpen(false)} />
       )}
       <main className="prev-main-floating">
         {children}

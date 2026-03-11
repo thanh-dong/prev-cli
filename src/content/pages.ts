@@ -17,6 +17,36 @@ export interface Page {
   description?: string
   frontmatter?: Frontmatter
   hidden?: boolean
+  cr?: string       // e.g. 'cr-001' — marks page as part of a change request
+  crStatus?: string // e.g. 'merged' | 'pending_review' | 'draft' | 'rejected'
+}
+
+export interface CRGroup {
+  cr_id: string      // e.g. 'cr-001'
+  slug?: string      // e.g. 'mute-until-next'
+  status?: string    // e.g. 'merged'
+  pages: Page[]
+}
+
+export function buildCRGroups(pages: Page[]): CRGroup[] {
+  const groups = new Map<string, CRGroup>()
+
+  for (const page of pages) {
+    if (!page.cr) continue
+    const cr_id = String(page.cr)
+    if (!groups.has(cr_id)) {
+      // Extract slug from cr-NNN-slug convention or from crSlug frontmatter
+      const slugMatch = cr_id.match(/^cr-\d+-(.+)$/)
+      const slug = (page.frontmatter?.['cr-slug'] as string | undefined) ?? slugMatch?.[1]
+      groups.set(cr_id, { cr_id, slug, status: page.crStatus, pages: [] })
+    }
+    const group = groups.get(cr_id)!
+    // Prefer the status from the page that has it set
+    if (page.crStatus && !group.status) group.status = page.crStatus
+    group.pages.push(page)
+  }
+
+  return Array.from(groups.values()).sort((a, b) => a.cr_id.localeCompare(b.cr_id))
 }
 
 export interface SidebarItem {
@@ -243,6 +273,14 @@ export async function scanPages(rootDir: string, options: ScanOptions = {}): Pro
       // Check if page is hidden via frontmatter
       if (frontmatter.hidden === true) {
         page.hidden = true
+      }
+
+      // Extract CR metadata from frontmatter
+      if (frontmatter.cr && typeof frontmatter.cr === 'string') {
+        page.cr = frontmatter.cr
+      }
+      if (frontmatter['cr-status'] && typeof frontmatter['cr-status'] === 'string') {
+        page.crStatus = frontmatter['cr-status'] as string
       }
 
       return page
