@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import type { Artifact, CommentThread } from '../server/routes/board'
+import { CommentThreadPopover } from './CommentThread'
 import './ArtifactCard.css'
 
 interface ArtifactCardProps {
@@ -48,6 +49,19 @@ export function ArtifactCard({ artifact, threads, boardId, onDragEnd, onCreateTh
             {thread.comments.length}
           </div>
         ))}
+
+        {openThreadId && (() => {
+          const thread = threads.find(t => t.id === openThreadId)
+          if (!thread) return null
+          return (
+            <CommentThreadPopover
+              thread={thread}
+              boardId={boardId}
+              onClose={() => setOpenThreadId(null)}
+              onRefresh={onRefresh}
+            />
+          )
+        })()}
 
         {artifact.type === 'preview' && (
           <iframe

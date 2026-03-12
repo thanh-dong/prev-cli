@@ -1,0 +1,106 @@
+.comment-thread-popover {
+  position: absolute;
+  width: 260px;
+  background: var(--fd-background);
+  border: 1px solid var(--fd-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.comment-thread-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--fd-border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fd-muted-foreground);
+}
+
+.comment-thread-status {
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.comment-thread-status[data-status="open"] { background: #dbeafe; color: #1e40af; }
+.comment-thread-status[data-status="update_requested"] { background: #fef3c7; color: #92400e; }
+.comment-thread-status[data-status="proposed"] { background: #d1fae5; color: #065f46; }
+
+.comment-thread-body {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.comment-thread-msg {
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.comment-thread-msg-author {
+  font-weight: 600;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.comment-thread-input {
+  padding: 8px 12px;
+  border-top: 1px solid var(--fd-border);
+  display: flex;
+  gap: 4px;
+}
+
+.comment-thread-input input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--fd-border);
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--fd-background);
+  color: var(--fd-foreground);
+  outline: none;
+}
+
+.comment-thread-actions {
+  padding: 8px 12px;
+  border-top: 1px solid var(--fd-border);
+  display: flex;
+  gap: 6px;
+}
+
+.comment-thread-btn {
+  flex: 1;
+  padding: 6px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comment-thread-btn-update {
+  background: #7c3aed;
+  color: #fff;
+}
+
+.comment-thread-btn-update:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comment-thread-btn-confirm {
+  background: #10b981;
+  color: #fff;
+}
+
+.comment-thread-btn-dismiss {
+  background: var(--fd-muted);
+  color: var(--fd-foreground);
+}

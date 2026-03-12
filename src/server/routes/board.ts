@@ -290,6 +290,55 @@ export function createBoardHandler(rootDir: string) {
       return Response.json(board)
     }
 
+    // ── POST /__prev/board/:id/threads/:threadId/comments — add comment to thread
+    const threadCommentMatch = subRoute?.match(/^threads\/([^/]+)\/comments$/)
+    if (req.method === 'POST' && threadCommentMatch) {
+      const threadId = threadCommentMatch[1]
+      let body: { author: string; text: string }
+      try { body = await req.json() as typeof body } catch {
+        return Response.json({ error: 'invalid JSON' }, { status: 400 })
+      }
+      const board = readBoard(rootDir, boardId)
+      const thread = board.threads.find(t => t.id === threadId)
+      if (!thread) return Response.json({ error: 'thread not found' }, { status: 404 })
+      const comment = { id: uid(), author: body.author, text: body.text, ts: new Date().toISOString() }
+      thread.comments.push(comment)
+      writeBoard(rootDir, board)
+      return Response.json(board)
+    }
+
+    // ── POST /__prev/board/:id/threads/:threadId/request-update — trigger generation
+    const requestUpdateMatch = subRoute?.match(/^threads\/([^/]+)\/request-update$/)
+    if (req.method === 'POST' && requestUpdateMatch) {
+      const threadId = requestUpdateMatch[1]
+      const board = readBoard(rootDir, boardId)
+      const thread = board.threads.find(t => t.id === threadId)
+      if (!thread) return Response.json({ error: 'thread not found' }, { status: 404 })
+
+      thread.status = 'update_requested'
+      thread.update_requested = true
+
+      const task: GenerationTask = {
+        id: uid(),
+        board_id: boardId,
+        type: 'update',
+        status: 'pending',
+        artifact_id: thread.artifact_id,
+        thread_id: threadId,
+        context: {
+          comments: thread.comments,
+          artifact_source: thread.artifact_source,
+          artifact_type: thread.artifact_type,
+        },
+        created_at: new Date().toISOString(),
+        retries: 0,
+      }
+      thread.task_id = task.id
+      board.queue.push(task)
+      writeBoard(rootDir, board)
+      return Response.json(board)
+    }
+
     // ── GET /__prev/board/:id/queue-status — queue status summary ──────────
     if (req.method === 'GET' && subRoute === 'queue-status') {
       const board = readBoard(rootDir, boardId)
