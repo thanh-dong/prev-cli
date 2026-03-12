@@ -36,42 +36,75 @@ function DocRenderer({ src }: { src: string }) {
   return <div className="artifact-body artifact-doc" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
+let mermaidInitialized = false
+
+async function renderMermaidInContainer(container: HTMLElement) {
+  const codeBlocks = container.querySelectorAll<HTMLElement>('code.language-mermaid')
+  if (codeBlocks.length === 0) return
+
+  const mermaid = (await import('mermaid')).default
+  if (!mermaidInitialized) {
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' })
+    mermaidInitialized = true
+  }
+
+  for (const block of codeBlocks) {
+    const pre = block.parentElement as HTMLElement
+    if (!pre || pre.dataset.rendered) continue
+    pre.dataset.rendered = 'true'
+    const code = block.textContent || ''
+    try {
+      const id = 'art-mermaid-' + Math.random().toString(36).slice(2)
+      const { svg } = await mermaid.render(id, code)
+      const wrap = document.createElement('div')
+      wrap.className = 'artifact-mermaid'
+      wrap.innerHTML = svg
+      pre.style.display = 'none'
+      pre.insertAdjacentElement('afterend', wrap)
+    } catch (e) {
+      console.warn('Mermaid render error:', e)
+    }
+  }
+}
+
 function FlowRenderer({ src }: { src: string }) {
   const [html, setHtml] = useState('')
   const ref = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     fetch(`/__prev/sot/content?path=${encodeURIComponent(src)}`)
       .then(r => r.text())
       .then(t => setHtml(marked.parse(t.replace(/^---[\s\S]*?---\n?/, '')) as string))
       .catch(() => setHtml('<p style="opacity:.4">Could not load.</p>'))
   }, [src])
+
   useEffect(() => {
     if (!html || !ref.current) return
-    const win = window as any
-    if (win.mermaid) {
-      try { win.mermaid.run({ nodes: ref.current.querySelectorAll('.language-mermaid') }) } catch { /**/ }
-    }
+    // Reset previously rendered blocks so they re-render on content change
+    ref.current.querySelectorAll('pre[data-rendered]').forEach(el => {
+      delete (el as HTMLElement).dataset.rendered
+    })
+    ref.current.querySelectorAll('.artifact-mermaid').forEach(el => el.remove())
+    ref.current.querySelectorAll('pre').forEach(el => (el as HTMLElement).style.display = '')
+    renderMermaidInContainer(ref.current)
   }, [html])
+
   return <div className="artifact-body artifact-doc" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 function ScreenRenderer({ src }: { src: string }) {
-  const previewName = src.replace(/\.(md|mdx)$/, '').replace(/\//g, '-')
-  const [fallback, setFallback] = useState(false)
-  const [raw, setRaw] = useState('')
-  useEffect(() => {
-    fetch(`/_preview-runtime?src=${previewName}`)
-      .then(r => { if (!r.ok) throw new Error() })
-      .catch(() => {
-        setFallback(true)
-        fetch(`/__prev/sot/content?path=${encodeURIComponent(src)}`)
-          .then(r => r.text())
-          .then(t => setRaw(t.replace(/^---[\s\S]*?---\n?/, '').replace(/^import .+$/gm, '')))
-          .catch(() => setRaw(''))
-      })
-  }, [src, previewName])
-  if (fallback) return <div className="artifact-body artifact-doc" dangerouslySetInnerHTML={{ __html: marked.parse(raw) as string }} />
-  return <iframe className="artifact-iframe" src={`/_preview-runtime?src=${previewName}`} title={src} loading="lazy" />
+  // SOT screens are already served as doc pages — use the route directly
+  // e.g. "screens/login.mdx" → "/screens/login"
+  const docUrl = '/' + src.replace(/\.(md|mdx)$/, '')
+  return (
+    <iframe
+      className="artifact-iframe"
+      src={docUrl}
+      title={src}
+      loading="lazy"
+      sandbox="allow-scripts allow-same-origin"
+    />
+  )
 }
 
 // ── Artifact card (draggable) ─────────────────────────────────────────────────
