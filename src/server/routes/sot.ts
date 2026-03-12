@@ -5,8 +5,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 export interface SotFile {
   path: string       // relative to rootDir, e.g. "flows/login.md"
   title: string      // derived from frontmatter or filename
-  type: 'flow' | 'screen' | 'doc' | 'ref'
-  ext: 'md' | 'mdx'
+  type: 'flow' | 'screen' | 'doc' | 'ref' | 'a2ui'
+  ext: 'md' | 'mdx' | 'jsonl'
 }
 
 const SKIP_DIRS = new Set(['.prev-boards', 'node_modules', '.git', 'previews'])
@@ -20,14 +20,32 @@ function extractTitle(content: string, filename: string): string {
   }
   const h1 = content.match(/^#\s+(.+)$/m)
   if (h1) return h1[1].trim()
-  return filename.replace(/\.(md|mdx)$/, '').replace(/[-_]/g, ' ')
+  return filename.replace(/\.(md|mdx|jsonl)$/, '').replace(/[-_]/g, ' ')
 }
 
-function inferType(relPath: string): SotFile['type'] {
+function extractA2UITitle(jsonl: string, filename: string): string {
+  // Try to find a Text component with usageHint h1 or h2 in first surfaceUpdate
+  try {
+    const firstLine = jsonl.split('\n').find(l => l.trim().startsWith('{'))
+    if (firstLine) {
+      const msg = JSON.parse(firstLine)
+      const comps: any[] = msg?.surfaceUpdate?.components ?? []
+      for (const c of comps) {
+        const hint = c?.component?.Text?.usageHint
+        const txt = c?.component?.Text?.text?.literalString
+        if ((hint === 'h1' || hint === 'h2') && txt) return txt.replace(/^[^\w]+ ?/, '').trim()
+      }
+    }
+  } catch { /* fall through */ }
+  return filename.replace(/\.jsonl$/, '').replace(/[-_]/g, ' ')
+}
+
+function inferType(relPath: string, ext: string): SotFile['type'] {
+  if (ext === 'jsonl') return 'a2ui'
   const parts = relPath.split('/')
   const dir = parts[0]
   if (dir === 'flows') return 'flow'
-  if (dir === 'screens' || dir === 'ui') return 'screen'
+  if (dir === 'screens' || dir === 'screens-a2ui' || dir === 'ui') return 'screen'
   if (dir === 'refs') return 'ref'
   return 'doc'
 }
@@ -43,25 +61,26 @@ function walk(dir: string, rootDir: string, results: SotFile[]) {
     const stat = statSync(full)
     if (stat.isDirectory()) {
       walk(full, rootDir, results)
-    } else if (/\.(md|mdx)$/.test(entry) && !SKIP_FILES.has(entry)) {
+    } else if (/\.(md|mdx|jsonl)$/.test(entry) && !SKIP_FILES.has(entry)) {
       const rel = path.relative(rootDir, full)
-      const ext = entry.endsWith('.mdx') ? 'mdx' : 'md'
-      let type = inferType(rel)
-      // md files with mermaid blocks are flows even outside /flows
-      if (ext === 'md') {
-        try {
-          const content = readFileSync(full, 'utf-8')
+      const ext = entry.endsWith('.jsonl') ? 'jsonl' : entry.endsWith('.mdx') ? 'mdx' : 'md'
+      const baseType = inferType(rel, ext)
+
+      try {
+        const content = readFileSync(full, 'utf-8')
+        if (ext === 'jsonl') {
+          const title = extractA2UITitle(content, entry)
+          results.push({ path: rel, title, type: 'a2ui', ext: 'jsonl' })
+        } else if (ext === 'md') {
+          let type = baseType
           if (hasMermaid(content)) type = 'flow'
           const title = extractTitle(content, entry)
-          results.push({ path: rel, title, type, ext })
-        } catch { /* skip */ }
-      } else {
-        try {
-          const content = readFileSync(full, 'utf-8')
+          results.push({ path: rel, title, type, ext: 'md' })
+        } else {
           const title = extractTitle(content, entry)
-          results.push({ path: rel, title, type: type === 'doc' ? 'screen' : type, ext })
-        } catch { /* skip */ }
-      }
+          results.push({ path: rel, title, type: baseType === 'doc' ? 'screen' : baseType, ext: 'mdx' })
+        }
+      } catch { /* skip unreadable files */ }
     }
   }
 }
@@ -75,8 +94,7 @@ export function createSotHandler(rootDir: string) {
     if (pathname === '/__prev/sot/list' && req.method === 'GET') {
       const files: SotFile[] = []
       if (existsSync(rootDir)) walk(rootDir, rootDir, files)
-      // Sort: flows first, then screens, refs, docs
-      const order: Record<string, number> = { flow: 0, screen: 1, ref: 2, doc: 3 }
+      const order: Record<string, number> = { a2ui: 0, flow: 1, screen: 2, ref: 3, doc: 4 }
       files.sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9) || a.path.localeCompare(b.path))
       return Response.json(files)
     }
@@ -84,7 +102,6 @@ export function createSotHandler(rootDir: string) {
     // GET /__prev/sot/content?path=... — file content
     if (pathname === '/__prev/sot/content' && req.method === 'GET') {
       const relPath = url.searchParams.get('path') || ''
-      // Security: no path traversal
       const abs = path.resolve(rootDir, relPath)
       if (!abs.startsWith(path.resolve(rootDir))) {
         return Response.json({ error: 'invalid path' }, { status: 400 })

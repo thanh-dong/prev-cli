@@ -6,8 +6,8 @@ import './BoardCanvas.css'
 
 marked.use({ breaks: true, gfm: true })
 
-const TYPE_ICON: Record<string, string> = { flow: '⇢', screen: '▣', doc: '📄', ref: '📎', preview: '⬡' }
-const TYPE_LABEL: Record<string, string> = { flow: 'Flow', screen: 'Screen', doc: 'Doc', ref: 'Ref', preview: 'Preview' }
+const TYPE_ICON: Record<string, string> = { flow: '⇢', screen: '▣', doc: '📄', ref: '📎', preview: '⬡', a2ui: '✦' }
+const TYPE_LABEL: Record<string, string> = { flow: 'Flow', screen: 'Screen', doc: 'Doc', ref: 'Ref', preview: 'Preview', a2ui: 'A2UI' }
 
 const CARD_W = 380
 const GRID_COLS = 3
@@ -155,6 +155,20 @@ function ScreenRenderer({ src, fillHeight }: { src: string; fillHeight: boolean 
   )
 }
 
+// ── A2UI renderer — embeds the a2ui bundle and plays a .jsonl file ────────────
+function A2UIRenderer({ src, fillHeight }: { src: string; fillHeight: boolean }) {
+  const rendererUrl = `/__prev/a2ui-render?src=${encodeURIComponent(src)}`
+  return (
+    <iframe
+      className={`artifact-iframe artifact-iframe-a2ui${fillHeight ? ' artifact-iframe--fill' : ''}`}
+      src={rendererUrl}
+      title={src}
+      loading="lazy"
+      allow="same-origin"
+    />
+  )
+}
+
 const CARD_MIN_W = 240
 const CARD_MIN_H = 80
 
@@ -221,6 +235,7 @@ function ArtifactCard({ artifact, zoom, localSize, onDragStart, onResizeStart, o
         {(artifact.type === 'c3-doc' || artifact.type === 'ref') && <DocRenderer src={artifact.source} />}
         {artifact.type === 'flow' && <FlowRenderer src={artifact.source} />}
         {(artifact.type as any) === 'screen' && <ScreenRenderer src={artifact.source} fillHeight={!!h} />}
+        {(artifact.type as any) === 'a2ui' && <A2UIRenderer src={artifact.source} fillHeight={!!h} />}
         {artifact.type === 'preview' && (
           <iframe
             className={`artifact-iframe${h ? ' artifact-iframe--fill' : ''}`}
@@ -250,7 +265,7 @@ function SotBrowser({ onAdd, collapsed, onToggle }: {
 }) {
   const [files, setFiles] = useState<SotFile[]>([])
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'all' | 'flow' | 'screen' | 'doc' | 'ref'>('all')
+  const [tab, setTab] = useState<'all' | 'flow' | 'screen' | 'doc' | 'ref' | 'a2ui'>('all')
 
   useEffect(() => {
     fetch('/__prev/sot/list').then(r => r.json()).then(setFiles).catch(() => {})
@@ -281,7 +296,7 @@ function SotBrowser({ onAdd, collapsed, onToggle }: {
       <input className="sot-browser-search" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} />
 
       <div className="sot-browser-tabs">
-        {(['all', 'flow', 'screen', 'doc', 'ref'] as const).map(t => (
+        {(['all', 'a2ui', 'flow', 'screen', 'doc', 'ref'] as const).map(t => (
           <button key={t} className={`sot-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
             {t === 'all' ? 'All' : TYPE_LABEL[t]}
           </button>
@@ -535,10 +550,12 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
   const handleAddFile = (file: SotFile) => {
     const index = board?.artifacts.length ?? 0
     const pos = autoPosition(index)
-    const typeMap: Record<SotFile['type'], Artifact['type']> = {
-      flow: 'flow', screen: 'screen' as any, doc: 'c3-doc', ref: 'c3-doc',
+    const typeMap: Record<string, Artifact['type']> = {
+      flow: 'flow', screen: 'screen' as any, doc: 'c3-doc', ref: 'c3-doc', a2ui: 'a2ui' as any,
     }
-    onAddArtifact({ type: typeMap[file.type] ?? 'c3-doc', source: file.path, title: file.title, ...pos, w: CARD_W, h: 0 })
+    // A2UI screens get a taller default h so they show content immediately
+    const defaultH = file.type === 'a2ui' ? 520 : 0
+    onAddArtifact({ type: typeMap[file.type] ?? 'c3-doc', source: file.path, title: file.title, ...pos, w: CARD_W, h: defaultH })
   }
 
   // ── ResizeObserver — track actual rendered card heights ───────────────────

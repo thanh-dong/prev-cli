@@ -49,6 +49,93 @@ export interface DevServerOptions {
   config?: PrevConfig
 }
 
+// ── A2UI renderer page ────────────────────────────────────────────────────────
+// Serves a standalone HTML page that loads the a2ui bundle, fetches a .jsonl
+// file from the SOT, and calls globalThis.openclawA2UI.applyMessages().
+function buildA2UIRenderer(src: string, _rootDir: string): string {
+  const encodedSrc = JSON.stringify(src)
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>A2UI Preview</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { height: 100%; margin: 0; background: #0d0d14; color: #e5e7eb; }
+    openclaw-a2ui-host {
+      display: block;
+      height: 100%;
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      --openclaw-a2ui-inset-top: 0px;
+      --openclaw-a2ui-inset-right: 0px;
+      --openclaw-a2ui-inset-bottom: 0px;
+      --openclaw-a2ui-inset-left: 0px;
+    }
+    #loading {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      font: 13px system-ui; color: rgba(255,255,255,0.4); pointer-events: none; z-index: 10;
+    }
+    #err {
+      position: fixed; bottom: 12px; left: 12px; right: 12px;
+      background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4);
+      color: #fca5a5; padding: 8px 12px; border-radius: 8px;
+      font: 12px monospace; display: none; z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading A2UI…</div>
+  <div id="err"></div>
+  <openclaw-a2ui-host></openclaw-a2ui-host>
+  <script src="/__prev/a2ui-bundle.js"></script>
+  <script>
+    const src = ${encodedSrc}
+    const loadingEl = document.getElementById('loading')
+    const errEl = document.getElementById('err')
+
+    function showErr(msg) {
+      if (errEl) { errEl.style.display = 'block'; errEl.textContent = msg }
+      if (loadingEl) loadingEl.style.display = 'none'
+    }
+
+    async function boot() {
+      // Wait for a2ui bundle to register the host element
+      await customElements.whenDefined('openclaw-a2ui-host')
+      if (!src) { showErr('No src provided'); return }
+
+      // Fetch JSONL file from SOT
+      const res = await fetch('/__prev/sot/content?path=' + encodeURIComponent(src))
+      if (!res.ok) { showErr('Failed to load: ' + src); return }
+      const text = await res.text()
+
+      // Parse JSONL lines into messages array
+      const messages = text
+        .split('\\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .map(l => { try { return JSON.parse(l) } catch { return null } })
+        .filter(Boolean)
+
+      if (messages.length === 0) { showErr('No valid JSONL messages in: ' + src); return }
+
+      // Apply to a2ui renderer
+      const api = globalThis.openclawA2UI
+      if (!api) { showErr('openclawA2UI not ready'); return }
+      api.reset()
+      api.applyMessages(messages)
+
+      if (loadingEl) loadingEl.style.display = 'none'
+    }
+
+    boot().catch(e => showErr(String(e)))
+  </script>
+</body>
+</html>`
+}
+
 // Build the theme app with Bun.build() — plugins are passed explicitly
 async function buildThemeApp(rootDir: string, include?: string[], config?: PrevConfig) {
   const entryPath = path.join(srcRoot, 'theme/entry.tsx')
@@ -238,6 +325,22 @@ export async function startDevServer(options: DevServerOptions) {
       // SOT file listing + content
       const sotResponse = await sotHandler(req)
       if (sotResponse) return sotResponse
+
+      // A2UI bundle served from OpenClaw
+      if (pathname === '/__prev/a2ui-bundle.js') {
+        const bundlePath = path.join(srcRoot, 'theme/a2ui.bundle.js')
+        try {
+          const js = readFileSync(bundlePath)
+          return new Response(js, { headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'public,max-age=3600' } })
+        } catch { return new Response('// bundle not found', { status: 404, headers: { 'Content-Type': 'application/javascript' } }) }
+      }
+
+      // A2UI renderer page — loads JSONL from SOT and renders via a2ui bundle
+      if (pathname === '/__prev/a2ui-render') {
+        const src = url.searchParams.get('src') ?? ''
+        const a2uiHtml = buildA2UIRenderer(src, rootDir)
+        return new Response(a2uiHtml, { headers: { 'Content-Type': 'text/html' } })
+      }
 
       // Preview bundle endpoint
       const bundleResponse = await previewBundleHandler(req)

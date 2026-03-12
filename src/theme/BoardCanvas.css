@@ -101,12 +101,14 @@
 .artifact-card-type[data-type="c3-doc"] { background: #d1fae5; color: #065f46; }
 .artifact-card-type[data-type="preview"] { background: #ede9fe; color: #5b21b6; }
 .artifact-card-type[data-type="ref"]     { background: #fce7f3; color: #9d174d; }
+.artifact-card-type[data-type="a2ui"]   { background: #1e1b4b; color: #a5b4fc; }
 
 .dark .artifact-card-type[data-type="flow"]    { background: rgba(245,158,11,.15); color: #fcd34d; }
 .dark .artifact-card-type[data-type="screen"]  { background: rgba(59,130,246,.15); color: #93c5fd; }
 .dark .artifact-card-type[data-type="c3-doc"] { background: rgba(16,185,129,.15); color: #6ee7b7; }
 .dark .artifact-card-type[data-type="preview"] { background: rgba(124,58,237,.15); color: #c4b5fd; }
 .dark .artifact-card-type[data-type="ref"]     { background: rgba(236,72,153,.15); color: #f9a8d4; }
+.dark .artifact-card-type[data-type="a2ui"]   { background: rgba(99,102,241,.2); color: #a5b4fc; }
 
 .artifact-card-remove {
   width: 18px;
@@ -214,6 +216,18 @@
   height: 100%;
   flex: 1;
   min-height: 0;
+}
+
+/* A2UI iframe — dark background, no scrollbar on chrome */
+.artifact-iframe-a2ui {
+  background: #0d0d14;
+  border-radius: 0 0 10px 10px;
+}
+
+.artifact-card-type[data-type="a2ui"] {
+  background: linear-gradient(135deg, rgba(124,58,237,0.18), rgba(59,130,246,0.18));
+  color: #a78bfa;
+  border: 1px solid rgba(124,58,237,0.3);
 }
 
 /* ── Zoom controls ── */
