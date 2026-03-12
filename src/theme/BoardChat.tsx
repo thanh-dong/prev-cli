@@ -30,10 +30,13 @@ interface BoardChatProps {
   board: BoardState | null
   setBoard: (b: BoardState) => void
   ws: React.MutableRefObject<WebSocket | null>
+  started: boolean
+  checking: boolean
+  onStart: () => void
 }
 
 // BoardChat reads board state from Board.tsx via props; WS events for streaming only
-export function BoardChat({ boardId, board, setBoard, ws }: BoardChatProps) {
+export function BoardChat({ boardId, board, setBoard, ws, started, checking, onStart }: BoardChatProps) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [streaming, setStreaming] = useState<StreamingMsg | null>(null)
@@ -113,6 +116,35 @@ export function BoardChat({ boardId, board, setBoard, ws }: BoardChatProps) {
 
   const isDisabled = board?.phase === 'generating' || board?.phase === 'done'
 
+  // ── Not yet started — show intro CTA ────────────────────────────────────
+  if (!started) {
+    return (
+      <div className="board-chat board-chat-idle">
+        <div className="board-chat-start-screen">
+          <div className="board-chat-start-avatar">🤖</div>
+          <h2 className="board-chat-start-title">OpenClaw</h2>
+          <p className="board-chat-start-desc">
+            Your AI collaborator. Start a session to think through your project, draft docs, design flows, or plan features.
+          </p>
+          <button
+            className="board-chat-start-btn"
+            onClick={onStart}
+            disabled={checking}
+          >
+            {checking
+              ? <><span className="board-chat-send-spinner" /> Checking…</>
+              : <>Start session <span className="board-chat-start-arrow">→</span></>
+            }
+          </button>
+          <span className="board-chat-start-hint">
+            Powered by OpenClaw · Claude Haiku
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Started but WS not yet connected / board loading ──────────────────────
   if (!board) {
     return (
       <div className="board-chat">

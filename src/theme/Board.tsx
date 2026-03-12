@@ -7,12 +7,13 @@ import './Board.css'
 
 function uid() { return Math.random().toString(36).slice(2, 10) }
 
-// ── Shared WS hook — both canvas and chat read from this ──────────────────────
-function useBoardChannel(boardId: string) {
+// ── Shared WS hook — lazy connect (only when started=true) ───────────────────
+function useBoardChannel(boardId: string, started: boolean) {
   const [board, setBoard] = useState<BoardState | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
+    if (!started) return
     let dead = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -32,9 +33,6 @@ function useBoardChannel(boardId: string) {
               return { ...prev, chat: [...prev.chat, event.message], phase: event.board.phase }
             })
           }
-          if (event.type === 'ai_start' || event.type === 'token' || event.type === 'ai_done' || event.type === 'error') {
-            // Forwarded to BoardChat via the same ws reference
-          }
           if (event.type === 'ai_done') setBoard(event.board)
           if (event.type === 'board_updated') setBoard(event.board)
         } catch { /* ignore */ }
@@ -50,7 +48,7 @@ function useBoardChannel(boardId: string) {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       wsRef.current?.close()
     }
-  }, [boardId])
+  }, [boardId, started])
 
   const addArtifact = async (artifact: Omit<Artifact, 'id'>) => {
     const newArtifact: Artifact = { ...artifact, id: uid() }
@@ -69,7 +67,22 @@ function useBoardChannel(boardId: string) {
 }
 
 export function Board({ boardId }: { boardId: string }) {
-  const { board, setBoard, addArtifact, ws } = useBoardChannel(boardId)
+  // Auto-resume if this board was already started (check via a quick fetch)
+  const [started, setStarted] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    // Peek at the board file — if it has prior chat, auto-start
+    fetch(`/__prev/board/${boardId}`)
+      .then(r => r.json())
+      .then((b: BoardState) => {
+        if (b.chat && b.chat.length > 0) setStarted(true)
+      })
+      .catch(() => {})
+      .finally(() => setChecking(false))
+  }, [boardId])
+
+  const { board, setBoard, addArtifact, ws } = useBoardChannel(boardId, started)
 
   return (
     <div className="board-layout">
@@ -82,7 +95,15 @@ export function Board({ boardId }: { boardId: string }) {
         />
       </div>
       <div className="board-chat-panel">
-        <BoardChat boardId={boardId} board={board} setBoard={setBoard} ws={ws} />
+        <BoardChat
+          boardId={boardId}
+          board={board}
+          setBoard={setBoard}
+          ws={ws}
+          started={started}
+          checking={checking}
+          onStart={() => setStarted(true)}
+        />
       </div>
     </div>
   )
