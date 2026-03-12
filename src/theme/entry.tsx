@@ -27,6 +27,7 @@ import { DevToolsProvider } from './DevToolsContext'
 import { StatusBadge } from './previews/StatusBadge'
 import { useApprovalStatus } from './hooks/useApprovalStatus'
 import { SnapshotCompare } from './previews/SnapshotCompare'
+import { Board } from './Board'
 import './styles.css'
 
 // PageTree types (simplified from fumadocs-core)
@@ -520,6 +521,12 @@ function PreviewPage() {
 function RootLayout() {
   const pageTree = convertToPageTree(sidebar)
   const location = useLocation()
+
+  // Board route gets its own full-viewport layout (no sidebar/toolbar)
+  if (location.pathname.startsWith('/board/')) {
+    return <Outlet />
+  }
+
   const isPreviewDetail = location.pathname.startsWith('/previews/') && location.pathname !== '/previews'
 
   // Preview detail page gets full viewport layout
@@ -581,6 +588,16 @@ const previewEmbedRoute = createRoute({
   component: PreviewEmbed,
 })
 
+const boardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/board/$boardId',
+  component: function BoardPage() {
+    const params = useParams({ strict: false })
+    const boardId = (params as any).boardId || ''
+    return <Board boardId={boardId} />
+  },
+})
+
 // Check if we have an index page (route '/')
 const hasIndexPage = pages.some((page: { route: string }) => page.route === '/')
 const firstPage = pages[0] as { route: string; file: string; title?: string; description?: string; frontmatter?: Record<string, unknown> } | undefined
@@ -637,6 +654,7 @@ const routeTree = rootRoute.addChildren([
   previewsRouteWithChildren,
   tokensRoute,
   previewEmbedRoute,
+  boardRoute,
   ...(indexRedirectRoute ? [indexRedirectRoute] : []),
   ...pageRoutes,
 ])
