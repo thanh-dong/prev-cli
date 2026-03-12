@@ -1,6 +1,6 @@
 // board.ts — server-side board state persistence + real-time channel
 import path from 'path'
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,9 @@ export interface CommentThread {
   status: ThreadStatus
 }
 
-export type BoardPhase = 'created' | 'discussing' | 'summarizing' | 'generating' | 'iterating' | 'finalizing' | 'done'
+export type BoardPhase =
+  | 'created' | 'discussing' | 'summarizing' | 'generating' | 'iterating' | 'finalizing' | 'done'
+  | 'pr' | 'merged' | 'handoff' | 'implemented'
 
 export type TaskType = 'initial' | 'update'
 export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'failed'
@@ -269,6 +271,42 @@ export function createBoardHandler(rootDir: string) {
   return async (req: Request): Promise<Response | null> => {
     const url = new URL(req.url)
     const pathname = url.pathname
+
+    // ── GET /__prev/boards — list all boards ──────────────────────────────
+    if (pathname === '/__prev/boards' && req.method === 'GET') {
+      const dir = boardsDir(rootDir)
+      try {
+        mkdirSync(dir, { recursive: true })
+        const files = readdirSync(dir)
+        const boards = await Promise.all(
+          files
+            .filter((f: string) => f.endsWith('.json'))
+            .map(async (f: string) => {
+              try {
+                const raw = readFileSync(path.join(dir, f), 'utf8')
+                const b: Board = JSON.parse(raw)
+                const lastMsg = b.chat.length > 0 ? b.chat[b.chat.length - 1] : null
+                const title = b.chat.find(m => m.author === 'openclaw')?.text?.slice(0, 60) ?? null
+                return {
+                  id: b.id,
+                  phase: b.phase,
+                  created_at: b.created_at,
+                  artifact_count: b.artifacts.length,
+                  message_count: b.chat.length,
+                  title,
+                  last_message: lastMsg ? { author: lastMsg.author, text: lastMsg.text.slice(0, 80), ts: lastMsg.ts } : null,
+                }
+              } catch { return null }
+            })
+        )
+        const sorted = boards
+          .filter(Boolean)
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        return Response.json(sorted)
+      } catch {
+        return Response.json([])
+      }
+    }
 
     const boardMatch = pathname.match(/^\/__prev\/board\/([^/]+)(?:\/(.+))?$/)
     if (!boardMatch) return null

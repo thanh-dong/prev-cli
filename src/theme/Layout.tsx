@@ -5,6 +5,7 @@ import { config } from 'virtual:prev-config'
 import { Toolbar } from './Toolbar'
 import { TOCPanel } from './TOCPanel'
 import { CRPanel } from './CRPanel'
+import { BoardListPanel } from './BoardListPanel'
 import { IconSprite } from './icons'
 import { StatusDropdown } from './previews/StatusDropdown'
 import { useApprovalStatus } from './hooks/useApprovalStatus'
@@ -13,6 +14,7 @@ import { crGroups } from 'virtual:prev-crs'
 import './Toolbar.css'
 import './TOCPanel.css'
 import './CRPanel.css'
+import './BoardListPanel.css'
 
 interface LayoutProps {
   tree: PageTree.Root
@@ -144,6 +146,7 @@ export function Layout({ tree, children }: LayoutProps) {
 
   const [tocOpen, setTocOpen] = useState(false)
   const [crOpen, setCrOpen] = useState(false)
+  const [boardsOpen, setBoardsOpen] = useState(false)
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -166,8 +169,9 @@ export function Layout({ tree, children }: LayoutProps) {
 
   const handleThemeToggle = () => setIsDark(!isDark)
   const handleWidthToggle = () => setIsFullWidth(!isFullWidth)
-  const handleTocToggle = () => { setTocOpen(!tocOpen); setCrOpen(false) }
-  const handleCRToggle = () => { setCrOpen(!crOpen); setTocOpen(false) }
+  const handleTocToggle = () => { setTocOpen(!tocOpen); setCrOpen(false); setBoardsOpen(false) }
+  const handleCRToggle = () => { setCrOpen(!crOpen); setTocOpen(false); setBoardsOpen(false) }
+  const handleBoardsToggle = () => { setBoardsOpen(!boardsOpen); setTocOpen(false); setCrOpen(false) }
 
   // Embed mode: just content, no chrome
   if (isEmbed) {
@@ -197,7 +201,10 @@ export function Layout({ tree, children }: LayoutProps) {
         onCRToggle={handleCRToggle}
         crOpen={crOpen}
         hasCRs={crGroups.length > 0}
+        onBoardsToggle={handleBoardsToggle}
+        boardsOpen={boardsOpen}
       />
+      {boardsOpen && <BoardListPanel onClose={() => setBoardsOpen(false)} />}
       <PageApprovalBadge />
       <CRContextBanner />
       {tocOpen && (
