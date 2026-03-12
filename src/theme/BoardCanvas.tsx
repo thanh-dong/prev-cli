@@ -10,17 +10,25 @@ const TYPE_ICON: Record<string, string> = { flow: '⇢', screen: '▣', doc: '�
 const TYPE_LABEL: Record<string, string> = { flow: 'Flow', screen: 'Screen', doc: 'Doc', ref: 'Ref', preview: 'Preview' }
 
 const CARD_W = 380
-const CARD_H = 340
 const GRID_COLS = 3
+const GRID_ROW_GAP = 40   // vertical gap between rows (content height is variable)
+const GRID_COL_GAP = 24
 const ZOOM_MIN = 0.2
 const ZOOM_MAX = 3
 
 // ── Auto-placement grid ───────────────────────────────────────────────────────
+// We don't know card height in advance (content-driven), so use column-based
+// placement: each column tracks its own y-cursor.
+const colCursors: number[] = []
 
 function autoPosition(index: number) {
   const col = index % GRID_COLS
-  const row = Math.floor(index / GRID_COLS)
-  return { x: col * (CARD_W + 24) + 24, y: row * (CARD_H + 24) + 24 }
+  if (!colCursors[col]) colCursors[col] = 24
+  const x = col * (CARD_W + GRID_COL_GAP) + 24
+  const y = colCursors[col]
+  // Estimate ~400px per card; updated by ResizeObserver in practice
+  colCursors[col] = (colCursors[col] ?? 24) + 400 + GRID_ROW_GAP
+  return { x, y }
 }
 
 // ── Content renderers ─────────────────────────────────────────────────────────
@@ -120,6 +128,7 @@ function ArtifactCard({ artifact, zoom, onDragStart, onRemove }: ArtifactCardPro
   return (
     <div
       className="artifact-card"
+      data-artifact-id={artifact.id}
       style={{
         position: 'absolute',
         left: artifact.x,
@@ -270,7 +279,10 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
   const panning = useRef<{ startMouse: { x: number; y: number }; startPan: { x: number; y: number } } | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const [localPositions, setLocalPositions] = useState<Record<string, { x: number; y: number }>>({})
+  // Tracks actual rendered card sizes (updated by ResizeObserver)
+  const cardSizes = useRef<Record<string, { w: number; h: number }>>({})
 
   // ── Wheel zoom ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -396,18 +408,51 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
     const typeMap: Record<SotFile['type'], Artifact['type']> = {
       flow: 'flow', screen: 'screen' as any, doc: 'c3-doc', ref: 'c3-doc',
     }
-    onAddArtifact({ type: typeMap[file.type] ?? 'c3-doc', source: file.path, title: file.title, ...pos, w: CARD_W, h: CARD_H })
+    onAddArtifact({ type: typeMap[file.type] ?? 'c3-doc', source: file.path, title: file.title, ...pos, w: CARD_W, h: 0 })
   }
+
+  // ── ResizeObserver — track actual rendered card heights ───────────────────
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const el = entry.target as HTMLElement
+        const id = el.dataset.artifactId
+        if (id) {
+          cardSizes.current[id] = {
+            w: entry.contentRect.width,
+            h: entry.contentRect.height,
+          }
+        }
+      }
+    })
+    // Observe existing cards
+    stage.querySelectorAll<HTMLElement>('[data-artifact-id]').forEach(el => ro.observe(el))
+    // Watch for new cards
+    const mo = new MutationObserver(muts => {
+      for (const m of muts) {
+        m.addedNodes.forEach(n => {
+          if (n instanceof HTMLElement && n.dataset.artifactId) ro.observe(n)
+        })
+      }
+    })
+    mo.observe(stage, { childList: true })
+    return () => { ro.disconnect(); mo.disconnect() }
+  }, [])
 
   const handleFit = () => {
     if (!board?.artifacts.length || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
-    const xs = board.artifacts.map(a => a.x)
-    const ys = board.artifacts.map(a => a.y)
-    const minX = Math.min(...xs)
-    const minY = Math.min(...ys)
-    const maxX = Math.max(...xs) + CARD_W
-    const maxY = Math.max(...ys) + CARD_H
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const a of board.artifacts) {
+      const pos = localPositions[a.id] ?? { x: a.x, y: a.y }
+      const size = cardSizes.current[a.id] ?? { w: CARD_W, h: 400 }
+      minX = Math.min(minX, pos.x)
+      minY = Math.min(minY, pos.y)
+      maxX = Math.max(maxX, pos.x + size.w)
+      maxY = Math.max(maxY, pos.y + size.h)
+    }
     const contentW = maxX - minX
     const contentH = maxY - minY
     const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(
@@ -415,7 +460,10 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
       (rect.height - 80) / contentH,
     ) * 0.9))
     setZoom(newZoom)
-    setPan({ x: (rect.width - contentW * newZoom) / 2 - minX * newZoom, y: (rect.height - contentH * newZoom) / 2 - minY * newZoom })
+    setPan({
+      x: (rect.width - contentW * newZoom) / 2 - minX * newZoom,
+      y: (rect.height - contentH * newZoom) / 2 - minY * newZoom,
+    })
   }
 
   // Merge server positions with optimistic local positions during drag
@@ -442,6 +490,7 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
 
         {/* Stage: zoom + pan via CSS transform */}
         <div
+          ref={stageRef}
           className="board-canvas-stage"
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0' }}
         >
