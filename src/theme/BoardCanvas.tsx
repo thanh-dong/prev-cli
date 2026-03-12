@@ -31,24 +31,17 @@ function autoPosition(index: number) {
   return { x, y }
 }
 
-// ── Content renderers ─────────────────────────────────────────────────────────
-
-function DocRenderer({ src }: { src: string }) {
-  const [html, setHtml] = useState('')
-  useEffect(() => {
-    fetch(`/__prev/sot/content?path=${encodeURIComponent(src)}`)
-      .then(r => r.text())
-      .then(t => setHtml(marked.parse(t.replace(/^---[\s\S]*?---\n?/, '')) as string))
-      .catch(() => setHtml('<p style="opacity:.4">Could not load.</p>'))
-  }, [src])
-  return <div className="artifact-body artifact-doc" dangerouslySetInnerHTML={{ __html: html }} />
-}
+// ── Mermaid / D2 — bake SVGs into HTML string before setting state ────────────
+// This avoids post-render DOM mutation which React can clobber on re-render.
 
 let mermaidInitialized = false
 
-async function renderMermaidInContainer(container: HTMLElement) {
-  const codeBlocks = container.querySelectorAll<HTMLElement>('code.language-mermaid')
-  if (codeBlocks.length === 0) return
+async function injectMermaidSvgs(html: string): Promise<string> {
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+
+  const codeBlocks = tmp.querySelectorAll<HTMLElement>('code.language-mermaid')
+  if (codeBlocks.length === 0) return html
 
   const mermaid = (await import('mermaid')).default
   if (!mermaidInitialized) {
@@ -58,52 +51,103 @@ async function renderMermaidInContainer(container: HTMLElement) {
 
   for (const block of codeBlocks) {
     const pre = block.parentElement as HTMLElement
-    // Use data-artifact-rendered (not data-rendered) so cleanupDiagrams() doesn't touch these
-    if (!pre || pre.dataset.artifactRendered) continue
-    pre.dataset.artifactRendered = 'true'
+    if (!pre) continue
     const code = block.textContent || ''
     try {
-      const id = 'art-mermaid-' + Math.random().toString(36).slice(2)
+      const id = 'art-m-' + Math.random().toString(36).slice(2)
       const { svg } = await mermaid.render(id, code)
       const wrap = document.createElement('div')
       wrap.className = 'artifact-mermaid'
       wrap.innerHTML = svg
-      // Remove <pre> from DOM entirely — cleanupDiagrams() restores display on pre[data-rendered]
-      // but won't touch pre[data-artifact-rendered], so remove is safe here too
       pre.replaceWith(wrap)
     } catch (e) {
       console.warn('Mermaid render error:', e)
     }
   }
+
+  return tmp.innerHTML
+}
+
+async function injectD2Svgs(html: string): Promise<string> {
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+
+  const codeBlocks = tmp.querySelectorAll<HTMLElement>('code.language-d2')
+  if (codeBlocks.length === 0) return html
+
+  let d2Instance: any = null
+  try {
+    const { D2 } = await import('@terrastruct/d2')
+    d2Instance = new D2()
+  } catch { return html }
+
+  for (const block of codeBlocks) {
+    const pre = block.parentElement as HTMLElement
+    if (!pre) continue
+    const code = block.textContent || ''
+    try {
+      const result = await d2Instance.compile(code)
+      const svg = await d2Instance.render(result.diagram, result.renderOptions)
+      const wrap = document.createElement('div')
+      wrap.className = 'artifact-mermaid'
+      wrap.innerHTML = svg
+      pre.replaceWith(wrap)
+    } catch (e) {
+      console.warn('D2 render error:', e)
+    }
+  }
+
+  return tmp.innerHTML
+}
+
+async function injectDiagramSvgs(rawHtml: string): Promise<string> {
+  let html = rawHtml
+  html = await injectMermaidSvgs(html)
+  html = await injectD2Svgs(html)
+  return html
+}
+
+// ── Content renderers ─────────────────────────────────────────────────────────
+
+function DocRenderer({ src }: { src: string }) {
+  const [html, setHtml] = useState('')
+  useEffect(() => {
+    fetch(`/__prev/sot/content?path=${encodeURIComponent(src)}`)
+      .then(r => r.text())
+      .then(async t => {
+        const raw = marked.parse(t.replace(/^---[\s\S]*?---\n?/, '')) as string
+        // Bake diagrams into HTML before setting state so React re-renders are safe
+        const final = await injectDiagramSvgs(raw)
+        setHtml(final)
+      })
+      .catch(() => setHtml('<p style="opacity:.4">Could not load.</p>'))
+  }, [src])
+  return <div className="artifact-body artifact-doc" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 function FlowRenderer({ src }: { src: string }) {
   const [html, setHtml] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch(`/__prev/sot/content?path=${encodeURIComponent(src)}`)
       .then(r => r.text())
-      .then(t => setHtml(marked.parse(t.replace(/^---[\s\S]*?---\n?/, '')) as string))
+      .then(async t => {
+        const raw = marked.parse(t.replace(/^---[\s\S]*?---\n?/, '')) as string
+        const final = await injectDiagramSvgs(raw)
+        setHtml(final)
+      })
       .catch(() => setHtml('<p style="opacity:.4">Could not load.</p>'))
   }, [src])
 
-  useEffect(() => {
-    if (!html || !ref.current) return
-    // <pre> blocks are replaced with .artifact-mermaid divs on render,
-    // so no cleanup needed — just render after HTML is set
-    renderMermaidInContainer(ref.current)
-  }, [html])
-
-  return <div className="artifact-body artifact-doc" ref={ref} dangerouslySetInnerHTML={{ __html: html }} />
+  return <div className="artifact-body artifact-doc" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
-function ScreenRenderer({ src }: { src: string }) {
-  // SOT screens are doc pages — load with ?embed to strip chrome (header/toolbar/sidebar)
+// ── Screen renderer — iframe fills card height when explicitly sized ───────────
+function ScreenRenderer({ src, fillHeight }: { src: string; fillHeight: boolean }) {
   const docUrl = '/' + src.replace(/\.(md|mdx)$/, '') + '?embed'
   return (
     <iframe
-      className="artifact-iframe"
+      className={`artifact-iframe${fillHeight ? ' artifact-iframe--fill' : ''}`}
       src={docUrl}
       title={src}
       loading="lazy"
@@ -176,9 +220,14 @@ function ArtifactCard({ artifact, zoom, localSize, onDragStart, onResizeStart, o
       >
         {(artifact.type === 'c3-doc' || artifact.type === 'ref') && <DocRenderer src={artifact.source} />}
         {artifact.type === 'flow' && <FlowRenderer src={artifact.source} />}
-        {(artifact.type as any) === 'screen' && <ScreenRenderer src={artifact.source} />}
+        {(artifact.type as any) === 'screen' && <ScreenRenderer src={artifact.source} fillHeight={!!h} />}
         {artifact.type === 'preview' && (
-          <iframe className="artifact-iframe" src={`/_preview-runtime?src=${artifact.source}`} title={title} loading="lazy" />
+          <iframe
+            className={`artifact-iframe${h ? ' artifact-iframe--fill' : ''}`}
+            src={`/_preview-runtime?src=${artifact.source}`}
+            title={title}
+            loading="lazy"
+          />
         )}
       </div>
 
