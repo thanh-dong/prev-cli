@@ -15,7 +15,7 @@ import { createComponentBundleHandler } from './routes/component-bundle'
 import { createTokensHandler } from './routes/tokens'
 import { handleOgImageRequest } from './routes/og-image'
 import { createApprovalHandler } from './routes/approval'
-import { createBoardHandler } from './routes/board'
+import { createBoardHandler, registerBoardWsClient } from './routes/board'
 import { BoardQueueProcessor } from './board-queue'
 import { loadConfig, updateOrder } from '../config'
 import type { PrevConfig } from '../config'
@@ -151,9 +151,34 @@ export async function startDevServer(options: DevServerOptions) {
   const server = Bun.serve({
     port,
 
-    async fetch(req) {
+    websocket: {
+      open(ws: import('bun').ServerWebSocket<{ boardId: string; cleanup: () => void }>) {
+        const { boardId } = ws.data
+        const cleanup = registerBoardWsClient(rootDir, boardId, (data) => {
+          try { ws.send(data) } catch { /* closed */ }
+        })
+        ws.data.cleanup = cleanup
+      },
+      message(_ws: import('bun').ServerWebSocket<{ boardId: string; cleanup: () => void }>, _msg: string | Buffer) {
+        // clients are receive-only; ignore inbound WS messages
+      },
+      close(ws: import('bun').ServerWebSocket<{ boardId: string; cleanup: () => void }>) {
+        ws.data.cleanup?.()
+      },
+    },
+
+    async fetch(req, server) {
       const url = new URL(req.url)
       const pathname = url.pathname
+
+      // WebSocket upgrade for board channel /__prev/board/:id/ws
+      const wsMatch = pathname.match(/^\/__prev\/board\/([a-zA-Z0-9_-]+)\/ws$/)
+      if (wsMatch) {
+        const boardId = wsMatch[1]
+        const upgraded = server.upgrade(req, { data: { boardId, cleanup: () => {} } })
+        if (upgraded) return undefined as unknown as Response
+        return new Response('WebSocket upgrade failed', { status: 426 })
+      }
 
       // SSE live reload endpoint
       if (pathname === '/__prev/events') {

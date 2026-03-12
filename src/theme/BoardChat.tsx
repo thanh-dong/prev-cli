@@ -40,63 +40,78 @@ export function BoardChat({ boardId }: BoardChatProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const greetedRef = useRef(false)
 
-  // ── Connect to the SSE channel ───────────────────────────────────────────
+  // ── Connect to the WebSocket channel ─────────────────────────────────────
   useEffect(() => {
-    const es = new EventSource(`/__prev/board/${boardId}/stream`)
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    let ws: WebSocket
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let dead = false
 
-    es.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data)
+    function connect() {
+      ws = new WebSocket(`${protocol}//${location.host}/__prev/board/${boardId}/ws`)
 
-        if (event.type === 'board') {
-          // Full board snapshot — initial connect or state sync
-          setBoard(event.board)
+      ws.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data as string)
+
+          if (event.type === 'board') {
+            setBoard(event.board)
+          }
+
+          if (event.type === 'message') {
+            setBoard(prev => {
+              if (!prev) return event.board
+              const already = prev.chat.some((m: ChatMessage) => m.id === event.message.id)
+              if (already) return prev
+              return { ...prev, chat: [...prev.chat, event.message], phase: event.board.phase }
+            })
+          }
+
+          if (event.type === 'ai_start') {
+            setSending(true)
+            setStreaming({ msgId: event.msgId, text: '' })
+          }
+
+          if (event.type === 'token') {
+            setStreaming(prev =>
+              prev?.msgId === event.msgId
+                ? { ...prev, text: prev.text + event.token }
+                : prev
+            )
+          }
+
+          if (event.type === 'ai_done') {
+            setStreaming(null)
+            setSending(false)
+            setBoard(event.board)
+          }
+
+          if (event.type === 'error') {
+            setStreaming(null)
+            setSending(false)
+          }
+        } catch { /* ignore */ }
+      }
+
+      ws.onclose = () => {
+        if (!dead) {
+          // Auto-reconnect after 1.5s
+          reconnectTimer = setTimeout(connect, 1500)
         }
+      }
 
-        if (event.type === 'message') {
-          // A new committed message (user or openclaw greeting)
-          setBoard(prev => {
-            if (!prev) return event.board
-            const already = prev.chat.some((m: ChatMessage) => m.id === event.message.id)
-            if (already) return prev
-            return { ...prev, chat: [...prev.chat, event.message], phase: event.board.phase }
-          })
-        }
-
-        if (event.type === 'ai_start') {
-          // OpenClaw started generating — show typing bubble
-          setSending(true)
-          setStreaming({ msgId: event.msgId, text: '' })
-        }
-
-        if (event.type === 'token') {
-          // Append incoming token to the streaming bubble
-          setStreaming(prev =>
-            prev?.msgId === event.msgId
-              ? { ...prev, text: prev.text + event.token }
-              : prev
-          )
-        }
-
-        if (event.type === 'ai_done') {
-          // AI finished — collapse streaming bubble into real message
-          setStreaming(null)
-          setSending(false)
-          setBoard(event.board)
-        }
-
-        if (event.type === 'error') {
-          setStreaming(null)
-          setSending(false)
-        }
-      } catch { /* ignore parse errors */ }
+      ws.onerror = () => {
+        ws.close()
+      }
     }
 
-    es.onerror = () => {
-      // EventSource auto-reconnects — nothing to do
-    }
+    connect()
 
-    return () => es.close()
+    return () => {
+      dead = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      ws?.close()
+    }
   }, [boardId])
 
   // ── Greeting on first load ───────────────────────────────────────────────

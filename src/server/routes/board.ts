@@ -75,27 +75,44 @@ export interface Board {
   queue: GenerationTask[]
 }
 
-// ── SSE Channel Registry ──────────────────────────────────────────────────────
-// Per-board set of connected browser clients. This is the "channel" —
-// tokens and board events are pushed here as they happen.
+// ── WebSocket Channel Registry ────────────────────────────────────────────────
+// Per-board set of connected browser clients. Generic send interface so
+// dev.ts can register real Bun ServerWebSocket instances here.
 
-type SSEController = ReadableStreamDefaultController<Uint8Array>
-
-const boardChannels = new Map<string, Set<SSEController>>()
-const encoder = new TextEncoder()
-
-function channelFor(boardId: string): Set<SSEController> {
-  if (!boardChannels.has(boardId)) boardChannels.set(boardId, new Set())
-  return boardChannels.get(boardId)!
+interface BoardClient {
+  send(data: string): void
 }
+
+const boardChannels = new Map<string, Set<BoardClient>>()
 
 function broadcast(boardId: string, event: object) {
   const clients = boardChannels.get(boardId)
   if (!clients || clients.size === 0) return
-  const chunk = encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
-  for (const ctrl of clients) {
-    try { ctrl.enqueue(chunk) } catch { clients.delete(ctrl) }
+  const data = JSON.stringify(event)
+  for (const client of clients) {
+    try { client.send(data) } catch { clients.delete(client) }
   }
+}
+
+// Called by dev.ts when a WebSocket connection opens for a board
+export function registerBoardWsClient(
+  rootDir: string,
+  boardId: string,
+  send: (data: string) => void,
+): () => void {
+  if (!boardChannels.has(boardId)) boardChannels.set(boardId, new Set())
+  const client: BoardClient = { send }
+  boardChannels.get(boardId)!.add(client)
+
+  // Push current board state immediately on connect
+  try {
+    const board = readBoard(rootDir, boardId)
+    if (!existsSync(boardPath(rootDir, boardId))) writeBoard(rootDir, board)
+    send(JSON.stringify({ type: 'board', board }))
+  } catch { /* ignore */ }
+
+  // Return cleanup
+  return () => { boardChannels.get(boardId)?.delete(client) }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,9 +196,10 @@ async function generateAIResponse(rootDir: string, boardId: string, chatHistory:
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${gatewayToken}`,
+        'x-openclaw-agent-id': 'board',
       },
       body: JSON.stringify({
-        model: 'openclaw:main',
+        model: 'openclaw:board',
         stream: true,
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       }),
@@ -260,37 +278,6 @@ export function createBoardHandler(rootDir: string) {
 
     if (!/^[a-zA-Z0-9_-]+$/.test(boardId)) {
       return Response.json({ error: 'invalid board id' }, { status: 400 })
-    }
-
-    // ── GET /__prev/board/:id/stream — persistent SSE channel ─────────────
-    // This is the live channel. The browser connects once and gets all
-    // board events pushed: messages, AI tokens, state changes.
-    if (subRoute === 'stream' && req.method === 'GET') {
-      let ctrl: SSEController
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          ctrl = controller
-          channelFor(boardId).add(controller)
-
-          // Send current board state immediately on connect
-          const board = readBoard(rootDir, boardId)
-          const chunk = encoder.encode(`data: ${JSON.stringify({ type: 'board', board })}\n\n`)
-          try { controller.enqueue(chunk) } catch { /* closed */ }
-        },
-        cancel() {
-          channelFor(boardId).delete(ctrl)
-        },
-      })
-
-      return new Response(stream, {
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache, no-transform',
-          'Connection': 'keep-alive',
-          'X-Accel-Buffering': 'no',
-          'Access-Control-Allow-Origin': '*',
-        },
-      })
     }
 
     // ── GET /__prev/board/:id — return full board state ────────────────────
