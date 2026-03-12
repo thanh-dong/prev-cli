@@ -111,19 +111,27 @@ function ScreenRenderer({ src }: { src: string }) {
   )
 }
 
-// ── Artifact card (draggable) ─────────────────────────────────────────────────
+const CARD_MIN_W = 240
+const CARD_MIN_H = 80
+
+// ── Artifact card (draggable + resizable) ────────────────────────────────────
 
 interface ArtifactCardProps {
   artifact: Artifact
   zoom: number
+  localSize: { w: number; h: number } | null
   onDragStart: (id: string, e: React.MouseEvent) => void
+  onResizeStart: (id: string, e: React.MouseEvent) => void
   onRemove: (id: string) => void
 }
 
-function ArtifactCard({ artifact, zoom, onDragStart, onRemove }: ArtifactCardProps) {
+function ArtifactCard({ artifact, zoom, localSize, onDragStart, onResizeStart, onRemove }: ArtifactCardProps) {
   const typeMap: Record<string, string> = { 'c3-doc': 'doc', flow: 'flow', screen: 'screen', preview: 'preview', ref: 'ref' }
   const displayType = typeMap[artifact.type] ?? artifact.type
   const title = artifact.title || artifact.source.split('/').pop()?.replace(/\.(md|mdx)$/, '') || artifact.id
+
+  const w = localSize?.w ?? (artifact.w > 0 ? artifact.w : CARD_W)
+  const h = localSize?.h ?? (artifact.h > 0 ? artifact.h : undefined)
 
   return (
     <div
@@ -133,7 +141,9 @@ function ArtifactCard({ artifact, zoom, onDragStart, onRemove }: ArtifactCardPro
         position: 'absolute',
         left: artifact.x,
         top: artifact.y,
-        width: CARD_W,
+        width: w,
+        // h > 0 means user set an explicit height — content scrolls inside
+        ...(h ? { height: h, overflow: 'hidden' } : {}),
       }}
     >
       {/* Header — drag handle */}
@@ -156,7 +166,14 @@ function ArtifactCard({ artifact, zoom, onDragStart, onRemove }: ArtifactCardPro
       </div>
 
       {/* Content — pointer-events passthrough to allow scrolling */}
-      <div className="artifact-card-content" style={{ pointerEvents: zoom > 0.5 ? 'auto' : 'none' }}>
+      <div
+        className="artifact-card-content"
+        style={{
+          pointerEvents: zoom > 0.5 ? 'auto' : 'none',
+          // When height is explicit, content area scrolls
+          ...(h ? { flex: 1, overflowY: 'auto', minHeight: 0 } : {}),
+        }}
+      >
         {(artifact.type === 'c3-doc' || artifact.type === 'ref') && <DocRenderer src={artifact.source} />}
         {artifact.type === 'flow' && <FlowRenderer src={artifact.source} />}
         {(artifact.type as any) === 'screen' && <ScreenRenderer src={artifact.source} />}
@@ -164,6 +181,13 @@ function ArtifactCard({ artifact, zoom, onDragStart, onRemove }: ArtifactCardPro
           <iframe className="artifact-iframe" src={`/_preview-runtime?src=${artifact.source}`} title={title} loading="lazy" />
         )}
       </div>
+
+      {/* Resize handle — bottom-right corner */}
+      <div
+        className="artifact-resize-handle"
+        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onResizeStart(artifact.id, e) }}
+        title="Drag to resize"
+      />
     </div>
   )
 }
@@ -275,12 +299,21 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
     current: { x: number; y: number }
   } | null>(null)
 
+  // Resize state
+  const resizing = useRef<{
+    artifactId: string
+    startMouse: { x: number; y: number }
+    startSize: { w: number; h: number }
+    current: { w: number; h: number }
+  } | null>(null)
+
   // Pan state
   const panning = useRef<{ startMouse: { x: number; y: number }; startPan: { x: number; y: number } } | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [localPositions, setLocalPositions] = useState<Record<string, { x: number; y: number }>>({})
+  const [localSizes, setLocalSizes] = useState<Record<string, { w: number; h: number }>>({})
   // Tracks actual rendered card sizes (updated by ResizeObserver)
   const cardSizes = useRef<Record<string, { w: number; h: number }>>({})
 
@@ -315,6 +348,20 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
   // ── Mouse move / up (global) ──────────────────────────────────────────────
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
+      // Resize artifact
+      if (resizing.current) {
+        const dx = (e.clientX - resizing.current.startMouse.x) / zoom
+        const dy = (e.clientY - resizing.current.startMouse.y) / zoom
+        const newW = Math.max(CARD_MIN_W, resizing.current.startSize.w + dx)
+        const newH = Math.max(CARD_MIN_H, resizing.current.startSize.h + dy)
+        resizing.current.current = { w: newW, h: newH }
+        setLocalSizes(prev => ({
+          ...prev,
+          [resizing.current!.artifactId]: { w: newW, h: newH },
+        }))
+        return
+      }
+
       // Drag artifact
       if (dragging.current) {
         const dx = (e.clientX - dragging.current.startMouse.x) / zoom
@@ -341,6 +388,24 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
     }
 
     const onUp = async () => {
+      // Save artifact size on resize end
+      if (resizing.current && board) {
+        const { artifactId, current } = resizing.current
+        const updated = board.artifacts.map(a =>
+          a.id === artifactId
+            ? { ...a, w: Math.round(current.w), h: Math.round(current.h) }
+            : a
+        )
+        resizing.current = null
+        await fetch(`/__prev/board/${boardId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ artifacts: updated }),
+        })
+        onBoardUpdate({ ...board, artifacts: updated })
+      }
+      resizing.current = null
+
       // Save artifact position on drag end
       if (dragging.current && board) {
         const { artifactId, current } = dragging.current
@@ -377,6 +442,22 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
       startMouse: { x: e.clientX, y: e.clientY },
       startPos: { x: artifact.x, y: artifact.y },
       current: { x: artifact.x, y: artifact.y },
+    }
+  }, [board])
+
+  const handleResizeStart = useCallback((artifactId: string, e: React.MouseEvent) => {
+    const artifact = board?.artifacts.find(a => a.id === artifactId)
+    if (!artifact) return
+    document.body.style.cursor = 'nwse-resize'
+    // Use current rendered size as start (fall back to stored w, or CARD_W)
+    const renderedSize = cardSizes.current[artifactId]
+    const startW = renderedSize?.w ?? (artifact.w > 0 ? artifact.w : CARD_W)
+    const startH = renderedSize?.h ?? (artifact.h > 0 ? artifact.h : CARD_MIN_H)
+    resizing.current = {
+      artifactId,
+      startMouse: { x: e.clientX, y: e.clientY },
+      startSize: { w: startW, h: startH },
+      current: { w: startW, h: startH },
     }
   }, [board])
 
@@ -508,7 +589,9 @@ export function BoardCanvas({ boardId, board, onAddArtifact, onBoardUpdate }: Bo
                 key={artifact.id}
                 artifact={withPos}
                 zoom={zoom}
+                localSize={localSizes[artifact.id] ?? null}
                 onDragStart={handleDragStart}
+                onResizeStart={handleResizeStart}
                 onRemove={handleRemove}
               />
             )
