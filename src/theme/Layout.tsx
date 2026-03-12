@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useLocation } from '@tanstack/react-router'
+import { useLocation, useNavigate } from '@tanstack/react-router'
 import type { PageTree } from 'fumadocs-core/server'
 import { config } from 'virtual:prev-config'
 import { Toolbar } from './Toolbar'
@@ -45,6 +45,43 @@ function PageApprovalBadge() {
         getAuditLog={getAuditLog}
       />
     </div>
+  )
+}
+
+function NewBoardButton() {
+  const navigate = useNavigate()
+  const [creating, setCreating] = useState(false)
+
+  const handleNewBoard = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      // Generate a short unique board ID
+      const boardId = Math.random().toString(36).slice(2, 10)
+      // Eagerly create the board on the server
+      await fetch(`/__prev/board/${boardId}`)
+      navigate({ to: `/board/${boardId}` })
+    } catch {
+      // Still navigate — board is created lazily on GET
+      const boardId = Math.random().toString(36).slice(2, 10)
+      navigate({ to: `/board/${boardId}` })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleNewBoard}
+      disabled={creating}
+      className="new-board-btn"
+      title="Create a new board"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      {creating ? 'Creating…' : 'New Board'}
+    </button>
   )
 }
 
@@ -131,6 +168,11 @@ export function Layout({ tree, children }: LayoutProps) {
   return (
     <div className="prev-layout-floating">
       <IconSprite />
+      <header className="prev-top-header">
+        <div className="prev-top-header-right">
+          <NewBoardButton />
+        </div>
+      </header>
       <Toolbar
         tree={tree}
         onThemeToggle={handleThemeToggle}
@@ -154,7 +196,7 @@ export function Layout({ tree, children }: LayoutProps) {
       {crOpen && (
         <CRPanel onClose={() => setCrOpen(false)} />
       )}
-      <main className="prev-main-floating">
+      <main className="prev-main-floating prev-main-with-header">
         {children}
       </main>
     </div>

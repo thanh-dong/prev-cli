@@ -10,29 +10,86 @@ interface BoardChatProps {
 
 export function BoardChat({ board, onRefresh }: BoardChatProps) {
   const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
   const messagesRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const isDisabled = board.phase === 'generating' || board.phase === 'done'
 
-  // Auto-scroll to bottom on new messages
+  // Trigger greeting on first load if board is empty
+  useEffect(() => {
+    if (board.chat.length === 0) {
+      fetch(`/__prev/board/${board.id}/greeting`, { method: 'POST' })
+        .then(() => onRefresh())
+        .catch(() => {})
+    }
+  }, [board.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-scroll to bottom on new messages or streaming text
   useEffect(() => {
     const el = messagesRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [board.chat.length])
+  }, [board.chat.length, streamingText])
 
   const sendMessage = async () => {
-    if (!text.trim() || isDisabled) return
+    if (!text.trim() || isDisabled || sending) return
     const msg = text.trim()
     setText('')
-    await fetch(`/__prev/board/${board.id}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author: 'user', text: msg }),
-    })
-    onRefresh()
+    setSending(true)
+    setStreamingText('')
+
+    try {
+      const response = await fetch(`/__prev/board/${board.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: msg }),
+      })
+
+      if (!response.body) {
+        setSending(false)
+        onRefresh()
+        return
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data = JSON.parse(line.slice(6))
+            if (data.token) {
+              accumulated += data.token
+              setStreamingText(accumulated)
+            }
+            if (data.done || data.error) {
+              setStreamingText('')
+              setSending(false)
+              onRefresh()
+            }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch {
+      setSending(false)
+      setStreamingText('')
+      onRefresh()
+    }
+
+    inputRef.current?.focus()
   }
 
   const handleConfirm = async () => {
-    // Transition to generating + enqueue initial task
     await fetch(`/__prev/board/${board.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -49,7 +106,6 @@ export function BoardChat({ board, onRefresh }: BoardChatProps) {
     onRefresh()
   }
 
-  // Show summary card during summarizing phase (last openclaw message)
   const summaryMsg = board.phase === 'summarizing'
     ? board.chat.findLast(m => m.author === 'openclaw')
     : null
@@ -57,7 +113,15 @@ export function BoardChat({ board, onRefresh }: BoardChatProps) {
   return (
     <div className="board-chat">
       <div className="board-chat-header">
-        <span className="board-chat-title">Chat</span>
+        <div className="board-chat-header-left">
+          <span className="board-chat-avatar">🤖</span>
+          <div>
+            <span className="board-chat-title">OpenClaw</span>
+            <span className="board-chat-status">
+              {sending ? 'typing…' : 'online'}
+            </span>
+          </div>
+        </div>
         <span className="board-chat-phase">{board.phase}</span>
       </div>
 
@@ -69,14 +133,30 @@ export function BoardChat({ board, onRefresh }: BoardChatProps) {
             data-author={msg.author === 'openclaw' ? 'openclaw' : 'user'}
           >
             <div className="board-chat-msg-author">
-              {msg.author}
+              {msg.author === 'openclaw' ? 'OpenClaw' : 'You'}
               <span className="board-chat-msg-time">
                 {new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            <div>{msg.text}</div>
+            <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
           </div>
         ))}
+
+        {/* Streaming typing bubble */}
+        {sending && (
+          <div className="board-chat-msg board-chat-msg-streaming" data-author="openclaw">
+            <div className="board-chat-msg-author">
+              OpenClaw
+              <span className="board-chat-msg-time">now</span>
+            </div>
+            {streamingText
+              ? <div style={{ whiteSpace: 'pre-wrap' }}>{streamingText}<span className="board-chat-cursor" /></div>
+              : <div className="board-chat-typing-dots">
+                  <span /><span /><span />
+                </div>
+            }
+          </div>
+        )}
 
         {/* Summary card with Confirm gate */}
         {summaryMsg && (
@@ -91,21 +171,24 @@ export function BoardChat({ board, onRefresh }: BoardChatProps) {
       </div>
 
       <QueueStatus boardId={board.id} />
+
       <div className="board-chat-input">
         <input
+          ref={inputRef}
           type="text"
           value={text}
           onChange={e => setText(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && sendMessage()}
-          placeholder={isDisabled ? 'Chat disabled during generation' : 'Type a message...'}
-          disabled={isDisabled}
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+          placeholder={isDisabled ? 'Chat disabled during generation' : 'Message OpenClaw…'}
+          disabled={isDisabled || sending}
+          autoFocus
         />
         <button
           className="board-chat-send-btn"
           onClick={sendMessage}
-          disabled={isDisabled || !text.trim()}
+          disabled={isDisabled || sending || !text.trim()}
         >
-          Send
+          {sending ? '…' : 'Send'}
         </button>
       </div>
     </div>

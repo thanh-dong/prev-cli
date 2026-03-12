@@ -1,24 +1,53 @@
-## Communication
+# CLAUDE.md — Derived Repo Agent Guide
 
-When asking clarifying questions, always use the AskUserQuestion tool instead of typing questions directly.
+This is the **derived repo** for `prev-cli` (fork). All architectural decisions
+are governed by the SOT repository.
 
-## Runtime
+## SOT Location
 
-Bun only. `bun test`, `bun install`, `bun run <script>`. No node/npm/yarn/pnpm/dotenv.
-Prefer `Bun.file` over `node:fs`, `Bun.$` over execa.
-Bun API docs: `node_modules/bun-types/docs/**.md`.
-
-## Releasing
-
-```bash
-git tag v0.x.x && git push origin v0.x.x
+```
+../prev-cli-sot
 ```
 
-CI runs tests, builds, publishes to npm, creates GitHub Release. Secret: `NPM_TOKEN`.
+## Before Making Changes
 
-## Architecture
+1. **Query architecture**: `/c3 query` — ask where things live before touching code
+2. **Impact assessment**: `/c3 sweep` — understand what breaks before refactoring
+3. **Feature changes**: Use `sot-manager` skill to draft → approve → merge via SOT first
 
-This project uses C3 architecture docs in `.c3/`.
-For architecture questions, changes, audits, file context → `/c3`.
-Operations: query, audit, change, ref, sweep.
-File lookup: `c3x lookup <file-or-glob>` maps files/directories to components + refs.
+## C3 Commands (run from SOT dir: `../prev-cli-sot`)
+
+```bash
+# What is X? Where is it?
+c3x query "approval webhook"
+
+# What breaks if I change Y?
+c3x sweep "approval-store"
+
+# Coverage check
+c3x coverage --c3-dir .c3
+
+# Full validation
+c3x check --c3-dir .c3
+```
+
+## Fork Delta
+
+This fork adds three capabilities on top of upstream prev-cli:
+
+| Component | What | Files |
+|-----------|------|-------|
+| c3-801 approval-store | File-based approval CRUD + webhook emit | `src/server/routes/approval.ts` |
+| c3-802 cr-context | `/__prev/cr-context` endpoint + CR banner | `src/server/routes/approval.ts`, `src/theme/CRPanel.tsx` |
+
+## Key Refs
+
+- `ref-approval-flow` — approval lifecycle from UI → webhook → merge gate
+- `ref-cr-lifecycle` — CR state machine and data contracts
+- `ref-prev-approval-webhook` — `prev-approval.v1` webhook schema
+
+## Do Not
+
+- Merge upstream changes into fork without updating SOT first
+- Add new routes/features to `src/server/routes/` without a SOT component doc
+- Change the `prev-approval.v1` schema without updating `ref-prev-approval-webhook`

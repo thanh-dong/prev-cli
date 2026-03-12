@@ -81,6 +81,87 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10)
 }
 
+// ── OpenClaw AI Integration ───────────────────────────────────────────────────
+
+const OPENCLAW_SYSTEM_PROMPT = `You are OpenClaw, an AI assistant embedded in a collaborative board inside prev-cli — a live documentation and design preview tool.
+
+Your role is to help users think through ideas, plan features, write documentation, review designs, generate artifacts, and collaborate on creative or technical work.
+
+Guidelines:
+- Be concise, practical, and thoughtful
+- When users describe something to build, help them refine requirements, then offer to generate relevant artifacts
+- Use markdown sparingly (you're in a chat, not a doc)
+- Address the user directly; keep a warm, competent tone
+- If asked about the board, artifacts, or prev-cli, explain what you can do: create docs, screens, flows, and design specs`
+
+async function streamOpenClawResponse(
+  chatHistory: ChatMessage[],
+  onToken: (token: string) => void,
+): Promise<string> {
+  // Use the OpenClaw gateway — that's me (Claude) running locally.
+  // The gateway exposes an OpenAI-compatible endpoint on the host.
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || ''
+  const gatewayHost = 'host.docker.internal'
+  const gatewayPort = 18789
+
+  const messages = chatHistory.map(m => ({
+    role: m.author === 'openclaw' ? 'assistant' : 'user',
+    content: m.text,
+  }))
+
+  const response = await fetch(`http://${gatewayHost}:${gatewayPort}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${gatewayToken}`,
+    },
+    body: JSON.stringify({
+      model: 'openclaw:main',
+      stream: true,
+      messages: [
+        { role: 'system', content: OPENCLAW_SYSTEM_PROMPT },
+        ...messages,
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`AI API error ${response.status}: ${errText}`)
+  }
+
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let fullText = ''
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? '' // keep incomplete last line
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data: ')) continue
+      const data = trimmed.slice(6)
+      if (data === '[DONE]') continue
+      try {
+        const parsed = JSON.parse(data)
+        const token: string = parsed.choices?.[0]?.delta?.content ?? ''
+        if (token) {
+          fullText += token
+          onToken(token)
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }
+
+  return fullText
+}
+
 function boardsDir(rootDir: string): string {
   return path.join(rootDir, '.prev-boards')
 }
@@ -336,6 +417,99 @@ export function createBoardHandler(rootDir: string) {
       thread.task_id = task.id
       board.queue.push(task)
       writeBoard(rootDir, board)
+      return Response.json(board)
+    }
+
+    // ── POST /__prev/board/:id/message — AI chat with streaming response ──
+    if (subRoute === 'message' && req.method === 'POST') {
+      let body: { text?: string }
+      try { body = await req.json() as typeof body } catch {
+        return Response.json({ error: 'invalid JSON' }, { status: 400 })
+      }
+      if (!body.text?.trim()) {
+        return Response.json({ error: 'missing text' }, { status: 400 })
+      }
+
+      const board = readBoard(rootDir, boardId)
+
+      // Save user message
+      const userMsg: ChatMessage = {
+        id: uid(),
+        author: 'user',
+        text: body.text.trim(),
+        ts: new Date().toISOString(),
+      }
+      board.chat.push(userMsg)
+      if (board.phase === 'created') board.phase = 'discussing'
+      writeBoard(rootDir, board)
+
+      const aiMsgId = uid()
+      const encoder = new TextEncoder()
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          const send = (payload: object) => {
+            try {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`))
+            } catch { /* controller closed */ }
+          }
+
+          try {
+            let fullText = ''
+            await streamOpenClawResponse(board.chat, (token) => {
+              fullText += token
+              send({ token })
+            })
+
+            // Save complete AI message
+            const latestBoard = readBoard(rootDir, boardId)
+            const aiMsg: ChatMessage = {
+              id: aiMsgId,
+              author: 'openclaw',
+              text: fullText,
+              ts: new Date().toISOString(),
+            }
+            latestBoard.chat.push(aiMsg)
+            writeBoard(rootDir, latestBoard)
+
+            send({ done: true })
+          } catch (err) {
+            send({ error: String(err) })
+          } finally {
+            controller.close()
+          }
+        },
+      })
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'X-Accel-Buffering': 'no',
+        },
+      })
+    }
+
+    // ── POST /__prev/board/:id/greeting — OpenClaw welcome message ─────────
+    if (subRoute === 'greeting' && req.method === 'POST') {
+      const board = readBoard(rootDir, boardId)
+
+      // Only greet once (empty chat)
+      if (board.chat.length > 0) {
+        return Response.json(board)
+      }
+
+      const greetingText = `Hey! I'm OpenClaw 👋 — your AI collaborator on this board.\n\nTell me what you're working on and I'll help you think it through, draft docs, design screens, or plan flows. What are we building today?`
+
+      const aiMsg: ChatMessage = {
+        id: uid(),
+        author: 'openclaw',
+        text: greetingText,
+        ts: new Date().toISOString(),
+      }
+      board.chat.push(aiMsg)
+      writeBoard(rootDir, board)
+
       return Response.json(board)
     }
 
