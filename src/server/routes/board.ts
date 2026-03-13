@@ -87,7 +87,7 @@ interface BoardClient {
 
 const boardChannels = new Map<string, Set<BoardClient>>()
 
-function broadcast(boardId: string, event: object) {
+export function broadcast(boardId: string, event: object) {
   const clients = boardChannels.get(boardId)
   if (!clients || clients.size === 0) return
   const data = JSON.stringify(event)
@@ -181,15 +181,47 @@ Guidelines:
 - When users describe something to build, help them refine requirements
 - Keep a warm, competent tone`
 
-async function generateAIResponse(rootDir: string, boardId: string, chatHistory: ChatMessage[]) {
+// Detect which agent should handle this message based on @mentions
+function detectAgentId(text: string): string {
+  if (/@sot-scribe/i.test(text)) return 'sot-scribe'
+  if (/@sot-editor/i.test(text)) return 'sot-editor'
+  return 'board'
+}
+
+// Build enriched context message for specialist agents (sot-scribe, sot-editor)
+function buildAgentContext(board: Board, agentId: string): string {
+  if (agentId === 'sot-scribe') {
+    return JSON.stringify({
+      board_id: board.id,
+      sot: board.sot || null,
+      phase: board.phase,
+      chat: board.chat,
+      artifacts: board.artifacts,
+      threads: board.threads,
+    })
+  }
+  return ''
+}
+
+async function generateAIResponse(rootDir: string, boardId: string, chatHistory: ChatMessage[], agentId = 'board') {
   const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || ''
   const gatewayHost = 'host.docker.internal'
   const gatewayPort = 18789
 
-  const messages = chatHistory.map(m => ({
-    role: m.author === 'openclaw' ? 'assistant' : 'user',
-    content: m.text,
-  }))
+  const board = chatHistory.length > 0
+    ? { id: boardId, sot: undefined, phase: 'discussing' as BoardPhase, chat: chatHistory, artifacts: [], threads: [], queue: [] } as Board
+    : { id: boardId, sot: undefined, phase: 'discussing' as BoardPhase, chat: [], artifacts: [], threads: [], queue: [] } as Board
+
+  // For specialist agents, prepend enriched board context as system message
+  const contextMsg = agentId !== 'board' ? buildAgentContext(board, agentId) : null
+
+  const messages = [
+    ...(contextMsg ? [{ role: 'system', content: `Board context:\n${contextMsg}` }] : []),
+    ...chatHistory.map(m => ({
+      role: m.author === 'openclaw' ? 'assistant' : 'user',
+      content: m.text,
+    })),
+  ]
 
   let response: Response
   try {
@@ -201,9 +233,11 @@ async function generateAIResponse(rootDir: string, boardId: string, chatHistory:
         'x-openclaw-agent-id': 'board',
       },
       body: JSON.stringify({
-        model: 'openclaw:board',
+        model: `openclaw:${agentId}`,
         stream: true,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+        messages: agentId === 'board'
+          ? [{ role: 'system', content: SYSTEM_PROMPT }, ...messages]
+          : messages,
       }),
     })
   } catch (err) {
@@ -368,7 +402,8 @@ export function createBoardHandler(rootDir: string) {
 
       // Trigger AI response asynchronously — don't await, return immediately
       if (body.author === 'user') {
-        generateAIResponse(rootDir, boardId, board.chat).catch(console.error)
+        const agentId = detectAgentId(body.text)
+        generateAIResponse(rootDir, boardId, board.chat, agentId).catch(console.error)
       }
 
       return Response.json({ ok: true, message })

@@ -15,7 +15,7 @@ import { createComponentBundleHandler } from './routes/component-bundle'
 import { createTokensHandler } from './routes/tokens'
 import { handleOgImageRequest } from './routes/og-image'
 import { createApprovalHandler } from './routes/approval'
-import { createBoardHandler, registerBoardWsClient } from './routes/board'
+import { createBoardHandler, registerBoardWsClient, broadcast } from './routes/board'
 import { createSotHandler } from './routes/sot'
 import { BoardQueueProcessor } from './board-queue'
 import { loadConfig, updateOrder } from '../config'
@@ -505,7 +505,7 @@ export async function startDevServer(options: DevServerOptions) {
   const approvalHandler = createApprovalHandler(rootDir, config?.approval?.webhookUrl)
   const boardHandler = createBoardHandler(rootDir)
   const sotHandler = createSotHandler(rootDir)
-  const queueProcessor = new BoardQueueProcessor(rootDir)
+  const queueProcessor = new BoardQueueProcessor(rootDir, broadcast)
   queueProcessor.start()
   const previewRuntimePath = path.join(srcRoot, 'preview-runtime/fast-template.html')
 
