@@ -50,8 +50,22 @@ export interface DevServerOptions {
 }
 
 // ── A2UI renderer page ────────────────────────────────────────────────────────
-// Serves a standalone HTML page that loads the a2ui bundle, fetches a .jsonl
-// file from the SOT, and calls globalThis.openclawA2UI.applyMessages().
+// Serves a themed HTML page that loads the a2ui bundle, applies the docliq
+// design token theme, fetches a .jsonl file from the SOT, and renders it.
+//
+// Theme strategy:
+//  • CSS custom properties on <openclaw-a2ui-host> → palette vars (--p-*, --n-*, etc.)
+//    These cascade into Lit shadow roots.
+//  • host.themeProvider.setValue(docliqTheme) → injects class names + additionalStyles
+//    into every component via Lit Context.
+//
+// Palette mapping (design tokens → Material3-style shades 0–100):
+//  p  = teal   (brand primary)
+//  s  = slate  (secondary)
+//  t  = coral  (tertiary / accent)
+//  n  = charcoal (neutral)
+//  nv = slate  (neutral variant)
+//  e  = coral  (error)
 function buildA2UIRenderer(src: string, _rootDir: string): string {
   const encodedSrc = JSON.stringify(src)
   return `<!DOCTYPE html>
@@ -60,38 +74,291 @@ function buildA2UIRenderer(src: string, _rootDir: string): string {
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>A2UI Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet"/>
   <style>
+    /* ── Page shell ──────────────────────────────────────────── */
     :root { color-scheme: dark; }
-    html, body { height: 100%; margin: 0; background: #0d0d14; color: #e5e7eb; }
+    html, body {
+      height: 100%; margin: 0;
+      background: #0F1719;          /* charcoal-800 */
+      font-family: "DM Sans", system-ui, sans-serif;
+    }
+
+    /* ── Host element – palette + font vars cascade into shadow DOM ── */
     openclaw-a2ui-host {
       display: block;
       height: 100%;
       position: fixed;
       inset: 0;
-      z-index: 4;
+      overflow-y: auto;
+      padding: 24px 20px 40px;
+      box-sizing: border-box;
+
+      /* Layout insets */
       --openclaw-a2ui-inset-top: 0px;
       --openclaw-a2ui-inset-right: 0px;
       --openclaw-a2ui-inset-bottom: 0px;
       --openclaw-a2ui-inset-left: 0px;
+
+      /* Font */
+      --font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-family-mono: "JetBrains Mono", monospace;
+
+      /* Color scheme (enables light-dark() in structural styles) */
+      --color-scheme: dark;
+
+      /* ── Primary palette: teal ─────────────────────────────── */
+      --p-0:   #000000; --p-5:   #053B43; --p-10:  #085560;
+      --p-15:  #096670; --p-20:  #0B6F7C; --p-25:  #0D7A88;
+      --p-30:  #0F8A99; --p-35:  #119FAA; --p-40:  #13A3B5;
+      --p-50:  #40B3C3; --p-60:  #6EC6D0; --p-70:  #9DD9E0;
+      --p-80:  #C5E9ED; --p-90:  #E8F6F8; --p-95:  #F3FBFC;
+      --p-98:  #F8FDFE; --p-99:  #FBFEFF; --p-100: #FFFFFF;
+
+      /* ── Neutral palette: charcoal ────────────────────────── */
+      --n-0:   #0A1012; --n-5:   #0F1719; --n-10:  #131D21;
+      --n-15:  #161F23; --n-20:  #182428; --n-25:  #1A2629;
+      --n-30:  #1C2A30; --n-35:  #2D4149; --n-40:  #4E5D64;
+      --n-50:  #748188; --n-60:  #9DA6AA; --n-70:  #C5CACC;
+      --n-80:  #E8EAEB; --n-90:  #F4F5F5; --n-95:  #F9FAFA;
+      --n-98:  #FDFEFE; --n-99:  #FEFEFE; --n-100: #FFFFFF;
+
+      /* ── Neutral-variant palette: slate ───────────────────── */
+      --nv-0:  #0A1012; --nv-5:  #161E22; --nv-10: #1F292D;
+      --nv-15: #263137; --nv-20: #2E3D43; --nv-25: #374951;
+      --nv-30: #3E5159; --nv-35: #445A62; --nv-40: #4E666F;
+      --nv-50: #5E7A86; --nv-60: #7C939D; --nv-70: #9AABB3;
+      --nv-80: #B8C3C9; --nv-90: #D5DBDF; --nv-95: #EEF1F3;
+      --nv-98: #F8F9FA; --nv-99: #FBFCFC; --nv-100: #FFFFFF;
+
+      /* ── Secondary palette: slate ─────────────────────────── */
+      --s-0:  #0A1012; --s-10: #1F292D; --s-20: #2E3D43;
+      --s-30: #3E5159; --s-40: #4E666F; --s-50: #5E7A86;
+      --s-60: #7C939D; --s-70: #9AABB3; --s-80: #B8C3C9;
+      --s-90: #D5DBDF; --s-95: #EEF1F3; --s-98: #F8F9FA;
+      --s-99: #FBFCFC; --s-100: #FFFFFF;
+
+      /* ── Tertiary palette: coral ──────────────────────────── */
+      --t-0:  #000000; --t-10: #772D21; --t-20: #A03D2D;
+      --t-30: #C9503A; --t-40: #E06A4F; --t-50: #E88A73;
+      --t-60: #EC9488; --t-70: #F0AD9E; --t-80: #F5C7BC;
+      --t-90: #FAE0D9; --t-95: #FDF3F0; --t-98: #FEF9F8;
+      --t-99: #FFF9F8; --t-100: #FFFFFF;
+
+      /* ── Error palette: coral ─────────────────────────────── */
+      --e-0:  #000000; --e-10: #772D21; --e-20: #A03D2D;
+      --e-30: #C9503A; --e-40: #E06A4F; --e-50: #E88A73;
+      --e-60: #EC9488; --e-70: #F0AD9E; --e-80: #F5C7BC;
+      --e-90: #FAE0D9; --e-95: #FDF3F0; --e-98: #FEF9F8;
+      --e-99: #FFF9F8; --e-100: #FFFFFF;
     }
+
     #loading {
       position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      font: 13px system-ui; color: rgba(255,255,255,0.4); pointer-events: none; z-index: 10;
+      font: 13px "DM Sans", system-ui; color: rgba(255,255,255,0.35); pointer-events: none; z-index: 10;
     }
     #err {
       position: fixed; bottom: 12px; left: 12px; right: 12px;
-      background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4);
-      color: #fca5a5; padding: 8px 12px; border-radius: 8px;
-      font: 12px monospace; display: none; z-index: 20;
+      background: rgba(224,106,79,0.15); border: 1px solid rgba(224,106,79,0.4);
+      color: #F0AD9E; padding: 10px 14px; border-radius: 10px;
+      font: 12px "JetBrains Mono", monospace; display: none; z-index: 20;
     }
   </style>
 </head>
 <body>
-  <div id="loading">Loading A2UI…</div>
+  <div id="loading">Rendering…</div>
   <div id="err"></div>
   <openclaw-a2ui-host></openclaw-a2ui-host>
   <script src="/__prev/a2ui-bundle.js"></script>
   <script>
+    // ── Docliq design token theme ────────────────────────────────────────────
+    // Applies our token palette to A2UI's structural CSS class system.
+    //
+    // Class naming reference (structural styles inside the bundle):
+    //  color-bgc-{key}   → background-color: light-dark(var(--{key-light}), var(--{key-dark}))
+    //  color-c-{key}     → color: light-dark(...)
+    //  color-bc-{key}    → border-color: light-dark(...)
+    //  border-br-{n}     → border-radius: n*4px
+    //  border-bw-{n}     → border-width: npx
+    //  border-bs-s       → border-style: solid
+    //  typography-f-s    → font-family: var(--font-family)
+    //  typography-f-c    → font-family: var(--font-family-mono)
+    //  typography-sz-*   → font-size + line-height (Material scale)
+    //  typography-w-{n}  → font-weight: n
+    //
+    // In dark mode, light-dark(var(--x-N), var(--x-inverse)) uses inverse shade (100-N).
+    // So color-bgc-n90 dark mode → --n-10 = #131D21 (dark card surface) ✓
+    //    color-c-n10  dark mode  → --n-90 = #F4F5F5 (light text) ✓
+    //    color-bgc-p40 dark mode → --p-60 = #6EC6D0 (teal button) ✓
+
+    const docliqTheme = {
+      components: {
+        // ── Typography ───────────────────────────────────────────────────────
+        Text: {
+          // Applied to every Text element
+          all: { 'typography-f-s': true, 'color-c-n10': true },
+          // Per-hint class overrides (no font-size here — see additionalStyles)
+          h1: { 'typography-w-700': true },
+          h2: { 'typography-w-600': true },
+          h3: { 'typography-w-600': true },
+          h4: { 'typography-w-500': true },
+          h5: { 'typography-w-500': true },
+          body: { 'typography-w-400': true },
+          caption: { 'typography-w-400': true, 'color-c-n40': true },
+        },
+
+        // ── Interactive components ───────────────────────────────────────────
+        // All buttons get primary teal styling; dark mode: bg=p-60 (#6EC6D0), text=p-0 (#000)
+        Button: {
+          'color-bgc-p40': true,  // dark: var(--p-60) = teal-300
+          'color-c-p100': true,   // dark: var(--p-0)  = black (legible on teal)
+          'border-br-3': true,    // radius: 12px
+          'typography-f-s': true,
+          'typography-w-500': true,
+        },
+
+        // ── Layout cards ─────────────────────────────────────────────────────
+        // dark: bg = --n-10 = #131D21 (charcoal-700), radius 16px
+        Card: {
+          'color-bgc-n90': true,
+          'border-br-4': true,
+        },
+
+        // ── Form elements ────────────────────────────────────────────────────
+        TextField: {
+          container: {},
+          // dark: bg = --nv-10 = #1F292D, radius 8px
+          element: { 'color-bgc-nv90': true, 'border-br-2': true, 'typography-f-s': true },
+          label: { 'typography-f-s': true, 'color-c-n40': true },
+        },
+        CheckBox: {
+          container: {},
+          // dark: border = --p-60 = teal-300
+          element: { 'color-bc-p40': true, 'border-bw-2': true, 'border-bs-s': true, 'border-br-1': true },
+          label: { 'typography-f-s': true },
+        },
+        Slider: {
+          container: {},
+          element: { 'color-bc-p40': true },
+          label: {},
+        },
+        MultipleChoice: {
+          container: {},
+          element: {
+            'color-bgc-nv90': true,
+            'color-bc-p40': true, 'border-bw-2': true, 'border-bs-s': true, 'border-br-2': true,
+          },
+          label: { 'typography-f-s': true },
+        },
+        DateTimeInput: {
+          container: {},
+          element: { 'color-bgc-nv90': true, 'border-br-2': true, 'typography-f-s': true },
+          label: { 'typography-f-s': true, 'color-c-n40': true },
+        },
+
+        // ── Tabs ─────────────────────────────────────────────────────────────
+        Tabs: {
+          container: { 'color-bgc-n90': true, 'border-br-3': true },
+          element: {},
+          controls: {
+            all: { 'typography-f-s': true, 'typography-w-400': true, 'color-c-n40': true },
+            // dark: active tab text = --p-60 = teal-300
+            selected: { 'typography-w-600': true, 'color-c-p40': true },
+          },
+        },
+
+        // ── Misc ─────────────────────────────────────────────────────────────
+        // dark: divider = --n-70 = #C5CACC → inverse --n-30 = #1C2A30
+        Divider: { 'color-bgc-n70': true },
+        Modal: {
+          backdrop: { 'color-bbgc-n10_50': true },
+          element: { 'color-bgc-n90': true, 'border-br-5': true },
+        },
+        List: {},
+        Row: {},
+        Column: {},
+        AudioPlayer: {},
+        Video: {},
+        Icon: {},
+        Image: {
+          all: {}, icon: {}, avatar: { 'border-br-50pc': true },
+          smallFeature: { 'border-br-3': true },
+          mediumFeature: { 'border-br-4': true },
+          largeFeature: { 'border-br-4': true },
+          header: {},
+        },
+      },
+
+      // ── HTML element classes (used in markdown rendering) ─────────────────
+      elements: {
+        a: { 'color-c-p40': true, 'typography-f-s': true },
+        audio: {},
+        body: { 'typography-f-s': true },
+        button: { 'typography-f-s': true },
+        h1: { 'typography-w-700': true, 'color-c-n10': true },
+        h2: { 'typography-w-600': true, 'color-c-n10': true },
+        h3: { 'typography-w-600': true, 'color-c-n10': true },
+        h4: { 'typography-w-500': true, 'color-c-n10': true },
+        h5: { 'typography-w-500': true, 'color-c-n10': true },
+        iframe: {},
+        input: { 'typography-f-s': true },
+        p: { 'color-c-n10': true },
+        pre: { 'typography-f-c': true },
+        textarea: { 'typography-f-s': true },
+        video: {},
+      },
+
+      // ── Markdown element classes ──────────────────────────────────────────
+      markdown: {
+        p:      ['typography-f-s', 'typography-w-400', 'color-c-n10'],
+        h1:     ['typography-f-s', 'typography-w-700', 'color-c-n10'],
+        h2:     ['typography-f-s', 'typography-w-600', 'color-c-n10'],
+        h3:     ['typography-f-s', 'typography-w-600', 'color-c-n10'],
+        h4:     ['typography-f-s', 'typography-w-500', 'color-c-n10'],
+        h5:     ['typography-f-s', 'typography-w-500', 'color-c-n10'],
+        ul:     [],
+        ol:     [],
+        li:     ['typography-f-s', 'color-c-n10'],
+        a:      ['color-c-p40'],
+        strong: ['typography-w-700'],
+        em:     [],
+      },
+
+      // ── Inline styles (CSSStyleDeclaration format) ───────────────────────
+      // Used for properties not covered by structural classes (font-size, letter-spacing, etc.)
+      // Text.additionalStyles can be a per-hint object.
+      additionalStyles: {
+        // Per-hint typography from design tokens (DM Sans optical sizing, tight tracking)
+        Text: {
+          h1:      { fontSize: '1.75rem', lineHeight: '1.35', letterSpacing: '-0.02em' },
+          h2:      { fontSize: '1.5rem',  lineHeight: '1.35', letterSpacing: '-0.02em' },
+          h3:      { fontSize: '1.25rem', lineHeight: '1.375', letterSpacing: '-0.01em' },
+          h4:      { fontSize: '1.125rem', lineHeight: '1.5',  letterSpacing: '-0.01em' },
+          h5:      { fontSize: '1rem',    lineHeight: '1.5',   letterSpacing: '0' },
+          body:    { fontSize: '1rem',    lineHeight: '1.5',   letterSpacing: '0' },
+          caption: { fontSize: '0.75rem', lineHeight: '1.4',   letterSpacing: '0.02em' },
+        },
+        // Button padding + transition
+        Button: {
+          padding: '12px 20px',
+          letterSpacing: '-0.01em',
+          transition: 'opacity 150ms ease',
+          width: '100%',
+          justifyContent: 'center',
+        },
+        // Card padding using token spacing-5 (1.25rem)
+        Card: {
+          padding: '20px',
+          gap: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        },
+      },
+    }
+
+    // ── Boot ──────────────────────────────────────────────────────────────────
     const src = ${encodedSrc}
     const loadingEl = document.getElementById('loading')
     const errEl = document.getElementById('err')
@@ -102,16 +369,21 @@ function buildA2UIRenderer(src: string, _rootDir: string): string {
     }
 
     async function boot() {
-      // Wait for a2ui bundle to register the host element
       await customElements.whenDefined('openclaw-a2ui-host')
-      if (!src) { showErr('No src provided'); return }
+      if (!src) { showErr('No src= provided'); return }
 
-      // Fetch JSONL file from SOT
+      // Apply docliq theme via the ContextProvider
+      const host = document.querySelector('openclaw-a2ui-host')
+      if (host && host.themeProvider) {
+        host.themeProvider.setValue(docliqTheme)
+      }
+
+      // Fetch JSONL from SOT
       const res = await fetch('/__prev/sot/content?path=' + encodeURIComponent(src))
-      if (!res.ok) { showErr('Failed to load: ' + src); return }
+      if (!res.ok) { showErr('Failed to load ' + src + ' (' + res.status + ')'); return }
       const text = await res.text()
 
-      // Parse JSONL lines into messages array
+      // Parse JSONL
       const messages = text
         .split('\\n')
         .map(l => l.trim())
@@ -121,9 +393,8 @@ function buildA2UIRenderer(src: string, _rootDir: string): string {
 
       if (messages.length === 0) { showErr('No valid JSONL messages in: ' + src); return }
 
-      // Apply to a2ui renderer
       const api = globalThis.openclawA2UI
-      if (!api) { showErr('openclawA2UI not ready'); return }
+      if (!api) { showErr('openclawA2UI global not available'); return }
       api.reset()
       api.applyMessages(messages)
 
