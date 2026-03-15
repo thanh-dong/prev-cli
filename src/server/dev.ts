@@ -73,336 +73,333 @@ function buildA2UIRenderer(src: string, _rootDir: string): string {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>A2UI Preview</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet"/>
+  <title>A2UI</title>
   <style>
-    /* ── Page shell ──────────────────────────────────────────── */
     :root { color-scheme: dark; }
+    *, *::before, *::after { box-sizing: border-box; }
     html, body {
-      height: 100%; margin: 0;
-      background: #0F1719;          /* charcoal-800 */
-      font-family: "DM Sans", system-ui, sans-serif;
+      margin: 0; padding: 0; height: 100%;
+      background: #0f1214;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 13px; color: #e8eaeb;
     }
+    #root { padding: 16px 18px 40px; }
+    #loading { padding: 48px; text-align: center; color: rgba(255,255,255,.3); font-size: 13px; }
+    #err { margin: 16px; padding: 12px 14px; border-radius: 8px;
+      background: rgba(224,106,79,.12); border: 1px solid rgba(224,106,79,.35); color: #f0ad9e; font-size: 12px; }
 
-    /* ── Host element – palette + font vars cascade into shadow DOM ── */
-    openclaw-a2ui-host {
-      display: block;
-      height: 100%;
-      position: fixed;
-      inset: 0;
-      overflow-y: auto;
-      padding: 24px 20px 40px;
-      box-sizing: border-box;
+    /* ── File badge ── */
+    .file-badge {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,.07);
+      background: rgba(255,255,255,.04); margin-bottom: 20px; }
+    .file-badge-icon { font-size: 16px; }
+    .file-badge-name { font-weight: 600; font-size: 14px; }
+    .file-badge-src { margin-left: 8px; font-size: 11px; font-family: monospace; color: #748188; }
+    .pills { margin-left: auto; display: flex; gap: 6px; }
+    .pill { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
 
-      /* Layout insets */
-      --openclaw-a2ui-inset-top: 0px;
-      --openclaw-a2ui-inset-right: 0px;
-      --openclaw-a2ui-inset-bottom: 0px;
-      --openclaw-a2ui-inset-left: 0px;
+    /* ── Section headers ── */
+    .section { margin-bottom: 20px; }
+    .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .section-head h3 { margin: 0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+    .section-line { flex: 1; height: 1px; background: rgba(255,255,255,.07); }
 
-      /* Font */
-      --font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      --font-family-mono: "JetBrains Mono", monospace;
+    /* ── Token cards ── */
+    .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+    .token-card { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03); }
+    .token-swatch { width: 32px; height: 32px; border-radius: 6px; border: 1px solid rgba(255,255,255,.1); flex-shrink: 0; }
+    .token-id { font-size: 12px; font-family: monospace; color: #6ec6d0; background: rgba(110,198,208,.1);
+      padding: 1px 6px; border-radius: 4px; }
+    .token-value { font-size: 12px; font-family: monospace; color: #748188; margin-left: 6px; }
+    .token-usage { font-size: 12px; color: #748188; margin-top: 3px; }
 
-      /* Color scheme (enables light-dark() in structural styles) */
-      --color-scheme: dark;
+    /* ── Component cards ── */
+    .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+    .comp-card { border-radius: 10px; border: 1px solid rgba(255,255,255,.07); overflow: hidden; background: rgba(255,255,255,.02); }
+    .comp-header { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.07);
+      background: rgba(255,255,255,.04); display: flex; align-items: center; gap: 8px; }
+    .comp-name { font-weight: 600; font-size: 14px; flex: 1; }
+    .comp-badge { font-size: 10px; padding: 2px 6px; background: rgba(110,198,208,.12); color: #6ec6d0;
+      border-radius: 4px; font-weight: 500; }
+    .comp-body { padding: 12px 14px; }
+    .prop-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+      color: #748188; margin-bottom: 6px; }
+    .prop-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 10px; }
+    .prop-table td { padding: 4px 6px 4px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+    .prop-table td:first-child { font-family: monospace; color: #6ec6d0; font-weight: 500; padding-right: 10px; white-space: nowrap; }
+    .prop-table td:last-child { font-family: monospace; color: #748188; }
+    .states-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+    .state-chip { padding: 3px 9px; border-radius: 6px; font-size: 11px; font-weight: 500;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); color: #e8eaeb; }
+    .state-chip.default { background: rgba(255,255,255,.04); }
+    .state-detail { font-weight: 400; color: #748188; margin-left: 4px; font-size: 10px; }
 
-      /* ── Primary palette: teal ─────────────────────────────── */
-      --p-0:   #000000; --p-5:   #053B43; --p-10:  #085560;
-      --p-15:  #096670; --p-20:  #0B6F7C; --p-25:  #0D7A88;
-      --p-30:  #0F8A99; --p-35:  #119FAA; --p-40:  #13A3B5;
-      --p-50:  #40B3C3; --p-60:  #6EC6D0; --p-70:  #9DD9E0;
-      --p-80:  #C5E9ED; --p-90:  #E8F6F8; --p-95:  #F3FBFC;
-      --p-98:  #F8FDFE; --p-99:  #FBFEFF; --p-100: #FFFFFF;
+    /* ── Screen cards ── */
+    .screen-list { display: flex; flex-direction: column; gap: 8px; }
+    .screen-card { border-radius: 12px; border: 1px solid rgba(255,255,255,.07); overflow: hidden; background: rgba(255,255,255,.02); }
+    .screen-header { padding: 12px 16px; background: rgba(255,255,255,.04);
+      display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+    .screen-icon { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; font-size: 12px; color: #fff;
+      background: linear-gradient(135deg, #0f8a99, #0b6f7c); }
+    .screen-title { font-weight: 600; font-size: 14px; flex: 1; }
+    .screen-route { font-size: 11px; font-family: monospace; color: #748188; }
+    .screen-c3 { font-size: 10px; color: #748188; }
+    .screen-chevron { color: #748188; font-size: 12px; margin-left: 4px; }
+    .screen-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid rgba(255,255,255,.07); }
 
-      /* ── Neutral palette: charcoal ────────────────────────── */
-      --n-0:   #0A1012; --n-5:   #0F1719; --n-10:  #131D21;
-      --n-15:  #161F23; --n-20:  #182428; --n-25:  #1A2629;
-      --n-30:  #1C2A30; --n-35:  #2D4149; --n-40:  #4E5D64;
-      --n-50:  #748188; --n-60:  #9DA6AA; --n-70:  #C5CACC;
-      --n-80:  #E8EAEB; --n-90:  #F4F5F5; --n-95:  #F9FAFA;
-      --n-98:  #FDFEFE; --n-99:  #FEFEFE; --n-100: #FFFFFF;
+    /* Layout tree */
+    .layout-tree { border-radius: 8px; border: 1px solid rgba(255,255,255,.07); overflow: hidden; font-family: monospace; font-size: 12px; }
+    .layout-row { padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,.05); display: flex; align-items: center; gap: 8px; }
+    .layout-row:last-child { border-bottom: none; }
+    .layout-row:nth-child(even) { background: rgba(255,255,255,.02); }
+    .layout-idx { color: #748188; font-size: 10px; width: 14px; flex-shrink: 0; }
+    .layout-child { color: #6ec6d0; }
 
-      /* ── Neutral-variant palette: slate ───────────────────── */
-      --nv-0:  #0A1012; --nv-5:  #161E22; --nv-10: #1F292D;
-      --nv-15: #263137; --nv-20: #2E3D43; --nv-25: #374951;
-      --nv-30: #3E5159; --nv-35: #445A62; --nv-40: #4E666F;
-      --nv-50: #5E7A86; --nv-60: #7C939D; --nv-70: #9AABB3;
-      --nv-80: #B8C3C9; --nv-90: #D5DBDF; --nv-95: #EEF1F3;
-      --nv-98: #F8F9FA; --nv-99: #FBFCFC; --nv-100: #FFFFFF;
+    /* AC list */
+    .ac-list { display: flex; flex-direction: column; gap: 6px; }
+    .ac-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px;
+      border-radius: 6px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); font-size: 12px; }
+    .ac-checkbox { width: 13px; height: 13px; border-radius: 3px; border: 1.5px solid rgba(255,255,255,.15);
+      background: transparent; flex-shrink: 0; margin-top: 1px; }
 
-      /* ── Secondary palette: slate ─────────────────────────── */
-      --s-0:  #0A1012; --s-10: #1F292D; --s-20: #2E3D43;
-      --s-30: #3E5159; --s-40: #4E666F; --s-50: #5E7A86;
-      --s-60: #7C939D; --s-70: #9AABB3; --s-80: #B8C3C9;
-      --s-90: #D5DBDF; --s-95: #EEF1F3; --s-98: #F8F9FA;
-      --s-99: #FBFCFC; --s-100: #FFFFFF;
+    /* ── Flow cards ── */
+    .flow-list { display: flex; flex-direction: column; gap: 10px; }
+    .flow-card { border-radius: 12px; border: 1px solid rgba(255,255,255,.07); overflow: hidden; background: rgba(255,255,255,.02); }
+    .flow-header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.07);
+      background: rgba(255,255,255,.04); display: flex; align-items: center; gap: 10px; }
+    .flow-icon { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; font-size: 14px; color: #fff; background: linear-gradient(135deg, #13a3b5, #0b6f7c); }
+    .flow-name { font-weight: 600; font-size: 14px; flex: 1; }
+    .flow-c3 { font-size: 11px; color: #748188; }
+    .flow-trigger { margin: 3px 0 0; font-size: 12px; color: #748188; font-style: italic; }
+    .flow-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 
-      /* ── Tertiary palette: coral ──────────────────────────── */
-      --t-0:  #000000; --t-10: #772D21; --t-20: #A03D2D;
-      --t-30: #C9503A; --t-40: #E06A4F; --t-50: #E88A73;
-      --t-60: #EC9488; --t-70: #F0AD9E; --t-80: #F5C7BC;
-      --t-90: #FAE0D9; --t-95: #FDF3F0; --t-98: #FEF9F8;
-      --t-99: #FFF9F8; --t-100: #FFFFFF;
+    /* Step spine */
+    .step-spine { display: flex; flex-direction: column; gap: 0; }
+    .step-row { display: flex; gap: 12px; align-items: flex-start; }
+    .spine-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+    .step-dot { width: 22px; height: 22px; border-radius: 50%; background: #0f8a99; color: #fff;
+      font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .spine-line { width: 2px; flex: 1; min-height: 14px; background: rgba(255,255,255,.07); margin: 2px 0; }
+    .step-content { flex: 1; padding-bottom: 12px; }
+    .step-content:last-child { padding-bottom: 0; }
+    .step-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+    .step-screen { font-family: monospace; font-size: 11px; background: rgba(110,198,208,.1); color: #6ec6d0;
+      padding: 1px 6px; border-radius: 4px; }
+    .step-action { color: #e8eaeb; }
+    .step-cond { font-size: 11px; padding: 1px 6px; background: rgba(234,179,8,.1); color: #eab308; border-radius: 4px; }
+    .step-sub { display: flex; gap: 6px; margin-top: 3px; font-size: 11px; flex-wrap: wrap; }
+    .step-next { color: #748188; }
+    .step-next-val { color: #22c55e; font-weight: 500; }
+    .step-effect { color: #748188; font-style: italic; }
 
-      /* ── Error palette: coral ─────────────────────────────── */
-      --e-0:  #000000; --e-10: #772D21; --e-20: #A03D2D;
-      --e-30: #C9503A; --e-40: #E06A4F; --e-50: #E88A73;
-      --e-60: #EC9488; --e-70: #F0AD9E; --e-80: #F5C7BC;
-      --e-90: #FAE0D9; --e-95: #FDF3F0; --e-98: #FEF9F8;
-      --e-99: #FFF9F8; --e-100: #FFFFFF;
-    }
+    /* Edge cases */
+    .edge-list { display: flex; flex-direction: column; gap: 6px; }
+    .edge-item { padding: 8px 12px; border-radius: 6px; background: rgba(234,179,8,.07);
+      border: 1px solid rgba(234,179,8,.2); font-size: 12px; }
+    .edge-scenario { font-weight: 600; color: #d4a017; }
+    .edge-behavior { color: #748188; }
 
-    #loading {
-      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-      font: 13px "DM Sans", system-ui; color: rgba(255,255,255,0.35); pointer-events: none; z-index: 10;
-    }
-    #err {
-      position: fixed; bottom: 12px; left: 12px; right: 12px;
-      background: rgba(224,106,79,0.15); border: 1px solid rgba(224,106,79,0.4);
-      color: #F0AD9E; padding: 10px 14px; border-radius: 10px;
-      font: 12px "JetBrains Mono", monospace; display: none; z-index: 20;
-    }
+    .empty { padding: 40px; text-align: center; color: #748188; font-size: 13px;
+      border-radius: 12px; border: 1px dashed rgba(255,255,255,.07); }
   </style>
 </head>
 <body>
-  <div id="loading">Rendering…</div>
-  <div id="err"></div>
-  <openclaw-a2ui-host></openclaw-a2ui-host>
-  <script src="/__prev/a2ui-bundle.js"></script>
+  <div id="loading">Loading…</div>
+  <div id="err" style="display:none"></div>
+  <div id="root" style="display:none"></div>
   <script>
-    // ── Docliq design token theme ────────────────────────────────────────────
-    // Applies our token palette to A2UI's structural CSS class system.
-    //
-    // Class naming reference (structural styles inside the bundle):
-    //  color-bgc-{key}   → background-color: light-dark(var(--{key-light}), var(--{key-dark}))
-    //  color-c-{key}     → color: light-dark(...)
-    //  color-bc-{key}    → border-color: light-dark(...)
-    //  border-br-{n}     → border-radius: n*4px
-    //  border-bw-{n}     → border-width: npx
-    //  border-bs-s       → border-style: solid
-    //  typography-f-s    → font-family: var(--font-family)
-    //  typography-f-c    → font-family: var(--font-family-mono)
-    //  typography-sz-*   → font-size + line-height (Material scale)
-    //  typography-w-{n}  → font-weight: n
-    //
-    // In dark mode, light-dark(var(--x-N), var(--x-inverse)) uses inverse shade (100-N).
-    // So color-bgc-n90 dark mode → --n-10 = #131D21 (dark card surface) ✓
-    //    color-c-n10  dark mode  → --n-90 = #F4F5F5 (light text) ✓
-    //    color-bgc-p40 dark mode → --p-60 = #6EC6D0 (teal button) ✓
-
-    const docliqTheme = {
-      components: {
-        // ── Typography ───────────────────────────────────────────────────────
-        Text: {
-          // Applied to every Text element
-          all: { 'typography-f-s': true, 'color-c-n10': true },
-          // Per-hint class overrides (no font-size here — see additionalStyles)
-          h1: { 'typography-w-700': true },
-          h2: { 'typography-w-600': true },
-          h3: { 'typography-w-600': true },
-          h4: { 'typography-w-500': true },
-          h5: { 'typography-w-500': true },
-          body: { 'typography-w-400': true },
-          caption: { 'typography-w-400': true, 'color-c-n40': true },
-        },
-
-        // ── Interactive components ───────────────────────────────────────────
-        // All buttons get primary teal styling; dark mode: bg=p-60 (#6EC6D0), text=p-0 (#000)
-        Button: {
-          'color-bgc-p40': true,  // dark: var(--p-60) = teal-300
-          'color-c-p100': true,   // dark: var(--p-0)  = black (legible on teal)
-          'border-br-3': true,    // radius: 12px
-          'typography-f-s': true,
-          'typography-w-500': true,
-        },
-
-        // ── Layout cards ─────────────────────────────────────────────────────
-        // dark: bg = --n-10 = #131D21 (charcoal-700), radius 16px
-        Card: {
-          'color-bgc-n90': true,
-          'border-br-4': true,
-        },
-
-        // ── Form elements ────────────────────────────────────────────────────
-        TextField: {
-          container: {},
-          element: { 'color-bgc-nv90': true, 'border-br-2': true, 'typography-f-s': true },
-          label: { 'typography-f-s': true, 'color-c-n40': true },
-        },
-        CheckBox: {
-          container: {},
-          element: { 'color-bc-p40': true, 'border-bw-2': true, 'border-bs-s': true, 'border-br-1': true },
-          label: { 'typography-f-s': true },
-        },
-        Slider: {
-          container: {},
-          element: { 'color-bc-p40': true },
-          // Slider always renders a <span> with the raw number value; make it subtle
-          label: { 'typography-sz-ls': true, 'color-c-n40': true },
-        },
-        MultipleChoice: {
-          container: {},
-          element: {
-            'color-bgc-nv90': true,
-            'color-bc-p40': true, 'border-bw-2': true, 'border-bs-s': true, 'border-br-2': true,
-          },
-          label: { 'typography-f-s': true },
-        },
-        DateTimeInput: {
-          container: {},
-          element: { 'color-bgc-nv90': true, 'border-br-2': true, 'typography-f-s': true },
-          label: { 'typography-f-s': true, 'color-c-n40': true },
-        },
-
-        // ── Tabs ─────────────────────────────────────────────────────────────
-        Tabs: {
-          container: { 'color-bgc-n90': true, 'border-br-3': true },
-          element: {},
-          controls: {
-            all: { 'typography-f-s': true, 'typography-w-400': true, 'color-c-n40': true },
-            // dark: active tab text = --p-60 = teal-300
-            selected: { 'typography-w-600': true, 'color-c-p40': true },
-          },
-        },
-
-        // ── Misc ─────────────────────────────────────────────────────────────
-        // dark: divider = --n-70 = #C5CACC → inverse --n-30 = #1C2A30
-        Divider: { 'color-bgc-n70': true },
-        Modal: {
-          backdrop: { 'color-bbgc-n10_50': true },
-          element: { 'color-bgc-n90': true, 'border-br-5': true },
-        },
-        List: {},
-        Row: {},
-        Column: {},
-        AudioPlayer: {},
-        Video: {},
-        Icon: {},
-        Image: {
-          all: {}, icon: {}, avatar: { 'border-br-50pc': true },
-          smallFeature: { 'border-br-3': true },
-          mediumFeature: { 'border-br-4': true },
-          largeFeature: { 'border-br-4': true },
-          header: {},
-        },
-      },
-
-      // ── HTML element classes (used in markdown rendering) ─────────────────
-      elements: {
-        a: { 'color-c-p40': true, 'typography-f-s': true },
-        audio: {},
-        body: { 'typography-f-s': true },
-        button: { 'typography-f-s': true },
-        h1: { 'typography-w-700': true, 'color-c-n10': true },
-        h2: { 'typography-w-600': true, 'color-c-n10': true },
-        h3: { 'typography-w-600': true, 'color-c-n10': true },
-        h4: { 'typography-w-500': true, 'color-c-n10': true },
-        h5: { 'typography-w-500': true, 'color-c-n10': true },
-        iframe: {},
-        input: { 'typography-f-s': true },
-        p: { 'color-c-n10': true },
-        pre: { 'typography-f-c': true },
-        textarea: { 'typography-f-s': true },
-        video: {},
-      },
-
-      // ── Markdown element classes ──────────────────────────────────────────
-      markdown: {
-        p:      ['typography-f-s', 'typography-w-400', 'color-c-n10'],
-        h1:     ['typography-f-s', 'typography-w-700', 'color-c-n10'],
-        h2:     ['typography-f-s', 'typography-w-600', 'color-c-n10'],
-        h3:     ['typography-f-s', 'typography-w-600', 'color-c-n10'],
-        h4:     ['typography-f-s', 'typography-w-500', 'color-c-n10'],
-        h5:     ['typography-f-s', 'typography-w-500', 'color-c-n10'],
-        ul:     [],
-        ol:     [],
-        li:     ['typography-f-s', 'color-c-n10'],
-        a:      ['color-c-p40'],
-        strong: ['typography-w-700'],
-        em:     [],
-      },
-
-      // ── Inline styles (CSSStyleDeclaration format) ───────────────────────
-      additionalStyles: {
-        // Per-hint typography from design tokens
-        Text: {
-          h1:      { fontSize: '1.75rem', lineHeight: '1.35',  letterSpacing: '-0.02em' },
-          h2:      { fontSize: '1.5rem',  lineHeight: '1.35',  letterSpacing: '-0.02em' },
-          h3:      { fontSize: '1.25rem', lineHeight: '1.375', letterSpacing: '-0.01em' },
-          h4:      { fontSize: '1.125rem',lineHeight: '1.5',   letterSpacing: '-0.01em' },
-          h5:      { fontSize: '1rem',    lineHeight: '1.5',   letterSpacing: '0' },
-          body:    { fontSize: '1rem',    lineHeight: '1.5',   letterSpacing: '0' },
-          caption: { fontSize: '0.75rem', lineHeight: '1.4',   letterSpacing: '0.02em' },
-        },
-        // Button: NO width:100% — let the <button> size to its content.
-        // The host has flex:1 from the parent, but the visible element auto-sizes.
-        Button: {
-          padding: '10px 18px',
-          letterSpacing: '-0.01em',
-          transition: 'opacity 150ms ease',
-        },
-        // Card: padding only — no flex overrides (Card source uses ::slotted height:100%)
-        Card: {
-          padding: '16px 20px',
-        },
-        // Row: critical — source has NO gap, children pack without spacing
-        Row: {
-          gap: '8px',
-        },
-        // Column: critical — source has NO gap, items stack without breathing room
-        Column: {
-          gap: '10px',
-        },
-      },
-    }
-
-    // ── Boot ──────────────────────────────────────────────────────────────────
+  (function() {
     const src = ${encodedSrc}
     const loadingEl = document.getElementById('loading')
     const errEl = document.getElementById('err')
+    const root = document.getElementById('root')
 
     function showErr(msg) {
-      if (errEl) { errEl.style.display = 'block'; errEl.textContent = msg }
       if (loadingEl) loadingEl.style.display = 'none'
+      errEl.style.display = 'block'; errEl.textContent = '⚠ ' + msg
     }
 
-    async function boot() {
-      await customElements.whenDefined('openclaw-a2ui-host')
-      if (!src) { showErr('No src= provided'); return }
+    function esc(s) {
+      if (s == null) return ''
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
 
-      // Apply docliq theme via the ContextProvider
-      const host = document.querySelector('openclaw-a2ui-host')
-      if (host && host.themeProvider) {
-        host.themeProvider.setValue(docliqTheme)
+    function pillHtml(count, label, bg, color) {
+      return '<span class="pill" style="background:'+bg+';color:'+color+'">'+count+' '+label+'</span>'
+    }
+
+    function renderToken(e) {
+      const isColor = /^#|^oklch|^rgb|^hsl/.test((e.value||'').trim())
+      return '<div class="token-card">'
+        + (isColor ? '<div class="token-swatch" style="background:'+esc(e.value)+'"></div>' : '')
+        + '<div>'
+        + '<div><span class="token-id">'+esc(e.id)+'</span><span class="token-value">'+esc(e.value)+'</span></div>'
+        + (e.usage ? '<div class="token-usage">'+esc(e.usage)+'</div>' : '')
+        + '</div></div>'
+    }
+
+    function renderComponent(e) {
+      const props = e.props ? Object.entries(e.props) : []
+      const states = e.states ? Object.entries(e.states) : []
+      return '<div class="comp-card">'
+        + '<div class="comp-header"><span>⬡</span><span class="comp-name">'+esc(e.id)+'</span>'
+        + '<span class="comp-badge">component</span></div>'
+        + '<div class="comp-body">'
+        + (props.length > 0 ? '<div class="prop-label">Props</div>'
+          + '<table class="prop-table"><tbody>'
+          + props.map(([k,v]) => '<tr><td>'+esc(k)+'</td><td>'+esc(v)+'</td></tr>').join('')
+          + '</tbody></table>' : '')
+        + (states.length > 0 ? '<div class="prop-label">States</div><div class="states-wrap">'
+          + states.map(([s, b]) => {
+              const bObj = typeof b === 'object' && b ? b : {}
+              const details = Object.entries(bObj).map(([k,v]) => {
+                if (Array.isArray(v)) return k+': ['+v.join(', ')+']'
+                return k+': '+JSON.stringify(v)
+              }).join('; ')
+              return '<div class="state-chip'+(s==='default'?' default':'')+'">'+esc(s)
+                + (details ? '<span class="state-detail">('+esc(details)+')</span>' : '')
+                + '</div>'
+            }).join('')
+          + '</div>' : '')
+        + '</div></div>'
+    }
+
+    function renderScreen(e) {
+      const id = 'sc-'+Math.random().toString(36).slice(2)
+      const children = e.layout && e.layout.children || []
+      const states = e.states ? Object.entries(e.states) : []
+      const ac = e.ac || []
+      const headerHtml = '<div class="screen-header" onclick="document.getElementById(\\''+id+'\\').style.display=document.getElementById(\\''+id+'\\').style.display===\\'none\\'?\\'\\':\\'none\\'">'
+        + '<div class="screen-icon">▣</div>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
+        + '<span class="screen-title">'+esc(e.title||e.id)+'</span>'
+        + (e.platform && e.platform!=='both' ? '<span style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:4px;color:#748188">'+esc(e.platform)+'</span>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;margin-top:2px">'
+        + (e.route ? '<code class="screen-route">'+esc(e.route)+'</code>' : '')
+        + (e.c3 ? '<span class="screen-c3">· '+esc(e.c3)+'</span>' : '')
+        + '</div></div>'
+        + '<span class="screen-chevron">▼</span>'
+        + '</div>'
+      let bodyHtml = '<div id="'+id+'" style="display:none" class="screen-body">'
+      if (children.length > 0) {
+        bodyHtml += '<div><div class="prop-label">Layout · '+(e.layout.type||'stack')+'</div>'
+          + '<div class="layout-tree">'
+          + children.map((c,i) => '<div class="layout-row"><span class="layout-idx">'+(i+1)+'</span><span class="layout-child">'+esc(c)+'</span></div>').join('')
+          + '</div></div>'
       }
-
-      // Fetch JSONL from SOT
-      const res = await fetch('/__prev/sot/content?path=' + encodeURIComponent(src))
-      if (!res.ok) { showErr('Failed to load ' + src + ' (' + res.status + ')'); return }
-      const text = await res.text()
-
-      // Parse JSONL
-      const messages = text
-        .split('\\n')
-        .map(l => l.trim())
-        .filter(l => l.length > 0)
-        .map(l => { try { return JSON.parse(l) } catch { return null } })
-        .filter(Boolean)
-
-      if (messages.length === 0) { showErr('No valid JSONL messages in: ' + src); return }
-
-      const api = globalThis.openclawA2UI
-      if (!api) { showErr('openclawA2UI global not available'); return }
-      api.reset()
-      api.applyMessages(messages)
-
-      if (loadingEl) loadingEl.style.display = 'none'
+      if (states.length > 0) {
+        bodyHtml += '<div><div class="prop-label">States</div><div class="states-wrap">'
+          + states.map(([s, b]) => {
+              const bObj = typeof b === 'object' && b ? b : {}
+              const parts = []
+              if (bObj.show) parts.push('show: '+bObj.show.join(', '))
+              if (bObj.hide) parts.push('hide: '+bObj.hide.join(', '))
+              if (bObj.disable) parts.push('disable: '+bObj.disable.join(', '))
+              const stateBg = s==='idle'?'rgba(255,255,255,.05)':s==='loading'?'rgba(234,179,8,.1)':s==='error'?'rgba(239,68,68,.1)':s==='success'?'rgba(34,197,94,.1)':'rgba(255,255,255,.05)'
+              const stateColor = s==='loading'?'#eab308':s==='error'?'#f87171':s==='success'?'#4ade80':'#e8eaeb'
+              return '<div class="state-chip" style="background:'+stateBg+';color:'+stateColor+'">'+esc(s)+(parts.length?' <span class="state-detail">('+esc(parts.join('; '))+')</span>':'')+'</div>'
+            }).join('')
+          + '</div></div>'
+      }
+      if (ac.length > 0) {
+        bodyHtml += '<div><div class="prop-label">Acceptance Criteria</div><div class="ac-list">'
+          + ac.map(a => '<div class="ac-item"><div class="ac-checkbox"></div><span>'+esc(a)+'</span></div>').join('')
+          + '</div></div>'
+      }
+      bodyHtml += '</div>'
+      return '<div class="screen-card">'+headerHtml+bodyHtml+'</div>'
     }
 
-    boot().catch(e => showErr(String(e)))
+    function renderFlow(e) {
+      const steps = e.steps || []
+      const edges = e.edge_cases || []
+      return '<div class="flow-card">'
+        + '<div class="flow-header">'
+        + '<div class="flow-icon">⇢</div>'
+        + '<div style="flex:1">'
+        + '<div style="display:flex;align-items:center;gap:8px"><span class="flow-name">'+esc(e.id)+'</span>'
+        + (e.c3 ? '<span class="flow-c3">· '+esc(e.c3)+'</span>' : '')+'</div>'
+        + (e.trigger ? '<div class="flow-trigger">'+esc(e.trigger)+'</div>' : '')
+        + '</div></div>'
+        + '<div class="flow-body">'
+        + (steps.length > 0
+          ? '<div><div class="prop-label">Steps</div><div class="step-spine">'
+            + steps.map((s,i) => '<div class="step-row">'
+                + '<div class="spine-col"><div class="step-dot">'+(i+1)+'</div>'
+                + (i<steps.length-1 ? '<div class="spine-line"></div>' : '')
+                + '</div>'
+                + '<div class="step-content'+( i<steps.length-1 ? '' : ' last' )+'">'
+                + '<div class="step-main"><span class="step-screen">'+esc(s.screen)+'</span><span style="color:#748188">→</span><span class="step-action">'+esc(s.action)+'</span>'
+                + (s.condition ? '<span class="step-cond">if: '+esc(s.condition)+'</span>' : '')
+                + '</div>'
+                + ((s.next||s.effect) ? '<div class="step-sub">'
+                  +(s.next?'<span class="step-next">→ <span class="step-next-val">'+esc(s.next)+'</span></span>':'')
+                  +(s.effect?'<span class="step-effect">· '+esc(s.effect)+'</span>':'')
+                  +'</div>' : '')
+                + '</div></div>'
+              ).join('')
+            + '</div></div>' : '')
+        + (edges.length > 0
+          ? '<div><div class="prop-label">Edge Cases</div><div class="edge-list">'
+            + edges.map(ec => '<div class="edge-item"><span class="edge-scenario">'+esc(ec.scenario)+'</span><span class="edge-behavior"> → '+esc(ec.behavior)+'</span></div>').join('')
+            + '</div></div>' : '')
+        + '</div></div>'
+    }
+
+    fetch('/__prev/sot/content?path=' + encodeURIComponent(src))
+      .then(r => { if (!r.ok) throw new Error(r.status + ' ' + r.statusText); return r.text() })
+      .then(text => {
+        const entries = text.split('\\n').map(l=>l.trim()).filter(Boolean)
+          .flatMap(l => { try { return [JSON.parse(l)] } catch { return [] } })
+
+        const tokens     = entries.filter(e=>e.type==='token')
+        const components = entries.filter(e=>e.type==='component')
+        const screens    = entries.filter(e=>e.type==='screen')
+        const flows      = entries.filter(e=>e.type==='flow')
+
+        const name = src.split('/').pop().replace('.jsonl','')
+        let html = '<div class="file-badge"><span class="file-badge-icon">⬡</span>'
+          + '<span class="file-badge-name">'+esc(name)+'</span>'
+          + '<code class="file-badge-src">'+esc(src)+'</code>'
+          + '<div class="pills">'
+          + (tokens.length     ? pillHtml(tokens.length,     'tokens',     'rgba(139,92,246,.15)', '#a78bfa') : '')
+          + (components.length ? pillHtml(components.length, 'components', 'rgba(110,198,208,.15)', '#6ec6d0') : '')
+          + (screens.length    ? pillHtml(screens.length,    'screens',    'rgba(99,102,241,.15)', '#818cf8') : '')
+          + (flows.length      ? pillHtml(flows.length,      'flows',      'rgba(34,197,94,.15)', '#4ade80') : '')
+          + '</div></div>'
+
+        if (tokens.length > 0) {
+          html += '<div class="section"><div class="section-head"><h3 style="color:#a78bfa">🎨 Design Tokens</h3><div class="section-line"></div></div>'
+            + '<div class="token-grid">'+tokens.map(renderToken).join('')+'</div></div>'
+        }
+        if (components.length > 0) {
+          html += '<div class="section"><div class="section-head"><h3 style="color:#6ec6d0">⬡ Components</h3><div class="section-line"></div></div>'
+            + '<div class="comp-grid">'+components.map(renderComponent).join('')+'</div></div>'
+        }
+        if (screens.length > 0) {
+          html += '<div class="section"><div class="section-head"><h3 style="color:#818cf8">▣ Screens</h3><div class="section-line"></div></div>'
+            + '<div class="screen-list">'+screens.map(renderScreen).join('')+'</div></div>'
+        }
+        if (flows.length > 0) {
+          html += '<div class="section"><div class="section-head"><h3 style="color:#4ade80">⇢ Flows</h3><div class="section-line"></div></div>'
+            + '<div class="flow-list">'+flows.map(renderFlow).join('')+'</div></div>'
+        }
+        if (entries.length === 0) {
+          html += '<div class="empty">No entries found in '+esc(src)+'</div>'
+        }
+
+        loadingEl.style.display = 'none'
+        root.innerHTML = html
+        root.style.display = 'block'
+      })
+      .catch(e => showErr(String(e)))
+  })()
   </script>
 </body>
 </html>`
